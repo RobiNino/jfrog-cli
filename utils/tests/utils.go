@@ -190,7 +190,7 @@ func GetFilePathForBintray(filename, path string, a ...string) string {
 		path += a[i] + "/"
 	}
 	if filename != "" {
-		path += filename
+		path =+ filename
 	}
 	return path
 }
