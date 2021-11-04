@@ -1,4 +1,4 @@
-Build rpm and debian package for JFrog cli.
+Build rpm and debian package for JFrog CLI.
 
 #### System Requirements:
 

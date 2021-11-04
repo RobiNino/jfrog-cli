@@ -12,7 +12,10 @@ node("docker") {
             [pkg: 'jfrog-cli-linux-ppc64le', goos: 'linux', goarch: 'ppc64le', fileExtention: '']
     ]
 
-    subject = 'jfrog'
+    cliExecutableName = 'jf'
+    basePathInReleases = 'jfrog-cli/v2-jf/'
+    majorVersion = 'v2'
+
     repo = 'jfrog-cli'
     sh 'rm -rf temp'
     sh 'mkdir temp'
@@ -34,45 +37,56 @@ node("docker") {
             }
         }
 
-        stage('Build JFrog CLI') {
-            jfrogCliRepoDir = "${cliWorkspace}/${repo}/"
-            jfrogCliDir = "${jfrogCliRepoDir}jfrog-cli/jfrog"
-            sh "echo jfrogCliDir=$jfrogCliDir"
+        runRelease()
+        if (RELEASE_DEPRECATED_EXECUTABLE_NAME.toBoolean()) {
+            cliExecutableName = 'jfrog'
+            basePathInReleases = 'jfrog-cli/v2/'
+            runRelease()
+        }
+    }
+}
 
-            sh 'go version'
-            dir("$jfrogCliRepoDir") {
-                sh 'build/build.sh'
-            }
+def runRelease() {
+    stage('Build JFrog CLI') {
+        sh "echo Running release for executable name: '$cliExecutableName'"
 
-            sh 'mkdir builder'
-            sh "mv $jfrogCliRepoDir/jfrog builder/"
+        jfrogCliRepoDir = "${cliWorkspace}/${repo}/"
+        builderDir = "${cliExecutableName}-builder/"
+        sh "mkdir $builderDir"
+        builderPath = "${builderDir}/${cliExecutableName}"
 
-            // Extract CLI version
-            version = sh(script: "builder/jfrog -v | tr -d 'jfrog version' | tr -d '\n'", returnStdout: true)
-            print "CLI version: $version"
+        sh 'go version'
+        dir("$jfrogCliRepoDir") {
+            sh "build/build.sh $cliExecutableName"
         }
 
-        if ("$EXECUTION_MODE".toString().equals("Publish packages")) {
+        sh "mv $jfrogCliRepoDir/$cliExecutableName $builderDir"
+        // Extract CLI version
+        version = sh(script: "$builderDir$cliExecutableName -v | tr -d 'jfrog version' | tr -d '\n'", returnStdout: true)
+        print "CLI version: $version"
+    }
+    if ("$EXECUTION_MODE".toString().equals("Publish packages")) {
+        stage('Build and Publish Rpm and Deb') {
             buildRpmAndDeb(version, architectures)
-
-            // Download cert files, to be used for signing the Windows executable, packaged by Chocolatey.
-            downloadToolsCert()
-            stage('Build and Publish Chocolatey') {
-                publishChocoPackage(version, jfrogCliRepoDir, architectures)
-            }
-
-            stage('Npm Publish') {
-                publishNpmPackage(jfrogCliRepoDir)
-            }
-
-            stage('Build and Publish Docker Images') {
-                buildPublishDockerImages(version, jfrogCliRepoDir)
-            }
-        } else if ("$EXECUTION_MODE".toString().equals("Build CLI")) {
-            downloadToolsCert()
-            print "Uploading version $version to releases.jfrog.io"
-            uploadCli(architectures)
         }
+
+        // Download cert files, to be used for signing the Windows executable, packaged by Chocolatey.
+        downloadToolsCert()
+        stage('Build and Publish Chocolatey') {
+            publishChocoPackage(version, jfrogCliRepoDir, architectures)
+        }
+
+        stage('Npm Publish') {
+            publishNpmPackage(jfrogCliRepoDir)
+        }
+
+        stage('Build and Publish Docker Images') {
+            buildPublishDockerImages(version, jfrogCliRepoDir)
+        }
+    } else if ("$EXECUTION_MODE".toString().equals("Build CLI")) {
+        downloadToolsCert()
+        print "Uploading version $version to releases.jfrog.io"
+        uploadCli(architectures)
     }
 }
 
@@ -81,7 +95,7 @@ def downloadToolsCert() {
         // Download the certificate file and key file, used for signing the JFrog CLI binary.
         withCredentials([string(credentialsId: 'download-signing-cert-access-token', variable: 'DOWNLOAD_SIGNING_CERT_ACCESS_TOKEN')]) {
         sh """#!/bin/bash
-            builder/jfrog rt dl installation-files/certificates/jfrog/jfrogltd_signingcer_full.tar.gz --url https://entplus.jfrog.io/artifactory --flat --access-token=$DOWNLOAD_SIGNING_CERT_ACCESS_TOKEN
+            $builderPath rt dl installation-files/certificates/jfrog/jfrogltd_signingcer_full.tar.gz --url https://entplus.jfrog.io/artifactory --flat --access-token=$DOWNLOAD_SIGNING_CERT_ACCESS_TOKEN
             """
         }
         sh 'tar -xvzf jfrogltd_signingcer_full.tar.gz'
@@ -91,7 +105,8 @@ def downloadToolsCert() {
 def buildRpmAndDeb(version, architectures) {
     boolean built = false
     withCredentials([file(credentialsId: 'rpm-gpg-key2', variable: 'rpmGpgKeyFile'), string(credentialsId: 'rpm-sign-passphrase', variable: 'rpmSignPassphrase')]) {
-        def dirPath = "${pwd()}/jfrog-cli/build/deb_rpm/pkg"
+        def dirName = "${majorVersion}-${cliExecutableName}"
+        def dirPath = "${pwd()}/jfrog-cli/build/deb_rpm/${dirName}/pkg"
         def gpgPassphraseFilePath = "$dirPath/RPM-GPG-PASSPHRASE-jfrog-cli"
         writeFile(file: gpgPassphraseFilePath, text: "$rpmSignPassphrase")
 
@@ -99,19 +114,19 @@ def buildRpmAndDeb(version, architectures) {
             def currentBuild = architectures[i]
             if (currentBuild.debianImage) {
                 stage("Build debian ${currentBuild.pkg}") {
-                    build(currentBuild.goos, currentBuild.goarch, currentBuild.pkg, 'jfrog')
+                    build(currentBuild.goos, currentBuild.goarch, currentBuild.pkg, $cliExecutableName)
                     dir("$jfrogCliRepoDir") {
-                        sh "build/deb_rpm/build-scripts/pack.sh -b jfrog -v $version -f deb --deb-arch $currentBuild.debianArch --deb-build-image $currentBuild.debianImage -t --deb-test-image $currentBuild.debianImage"
+                        sh "build/deb_rpm/$dirName/build-scripts/pack.sh -b $cliExecutableName -v $version -f deb --deb-arch $currentBuild.debianArch --deb-build-image $currentBuild.debianImage -t --deb-test-image $currentBuild.debianImage"
                         built = true
                     }
                 }
             }
             if (currentBuild.rpmImage) {
                 stage("Build rpm ${currentBuild.pkg}") {
-                    build(currentBuild.goos, currentBuild.goarch, currentBuild.pkg, 'jfrog')
+                    build(currentBuild.goos, currentBuild.goarch, currentBuild.pkg, $cliExecutableName)
                     dir("$jfrogCliRepoDir") {
                         sh """#!/bin/bash
-                            build/deb_rpm/build-scripts/pack.sh -b jfrog -v $version -f rpm --rpm-build-image $currentBuild.rpmImage -t --rpm-test-image $currentBuild.rpmImage --rpm-gpg-key-file /$rpmGpgKeyFile --rpm-gpg-passphrase-file $gpgPassphraseFilePath
+                            build/deb_rpm/$dirName/build-scripts/pack.sh -b $cliExecutableName -v $version -f rpm --rpm-build-image $currentBuild.rpmImage -t --rpm-test-image $currentBuild.rpmImage --rpm-gpg-key-file /$rpmGpgKeyFile --rpm-gpg-passphrase-file $gpgPassphraseFilePath
                         """
                         built = true
                     }
@@ -123,10 +138,14 @@ def buildRpmAndDeb(version, architectures) {
             stage("Deploy deb and rpm") {
                 withCredentials([string(credentialsId: 'jfrog-cli-automation', variable: 'JFROG_CLI_AUTOMATION_ACCESS_TOKEN')]) {
                     options = "--url https://releases.jfrog.io/artifactory --flat --access-token=$JFROG_CLI_AUTOMATION_ACCESS_TOKEN"
+                    def packageName = "jfrog-cli-v2"
+                    if ($cliExecutableName == 'jf') {
+                        packageName="${packageName}-jf"
+                    }
                     sh """#!/bin/bash
-                        builder/jfrog rt u $jfrogCliRepoDir/build/deb_rpm/*.i386.deb jfrog-debs/pool/jfrog-cli-v2/ --deb=xenial,bionic,eoan,focal/contrib/i386 $options
-                        builder/jfrog rt u $jfrogCliRepoDir/build/deb_rpm/*.x86_64.deb jfrog-debs/pool/jfrog-cli-v2/ --deb=xenial,bionic,eoan,focal/contrib/amd64 $options
-                        builder/jfrog rt u $jfrogCliRepoDir/build/deb_rpm/*.rpm jfrog-rpms/jfrog-cli-v2/ $options
+                        $builderPath rt u $jfrogCliRepoDir/build/deb_rpm/$dirName/*.i386.deb jfrog-debs/pool/$packageName/ --deb=xenial,bionic,eoan,focal/contrib/i386 $options
+                        $builderPath rt u $jfrogCliRepoDir/build/deb_rpm/$dirName/*.x86_64.deb jfrog-debs/pool/$packageName/ --deb=xenial,bionic,eoan,focal/contrib/amd64 $options
+                        $builderPath rt u $jfrogCliRepoDir/build/deb_rpm/$dirName/*.rpm jfrog-rpms/$packageName/ $options
                         """
                 }
             }
@@ -148,33 +167,25 @@ def uploadCli(architectures) {
 
 def buildPublishDockerImages(version, jfrogCliRepoDir) {
     def images = [
-            // Pushing the second slim name for backward compatibility.
-            [dockerFile:'build/docker/slim/Dockerfile', names:['releases-docker.jfrog.io/jfrog/jfrog-cli-v2']],
-            [dockerFile:'build/docker/full/Dockerfile', names:['releases-docker.jfrog.io/jfrog/jfrog-cli-full-v2']]
+            [dockerFile:'build/docker/slim/Dockerfile', name:'releases-docker.jfrog.io/jfrog/jfrog-cli-v2'],
+            [dockerFile:'build/docker/full/Dockerfile', name:'releases-docker.jfrog.io/jfrog/jfrog-cli-full-v2']
     ]
     for (int i = 0; i < images.size(); i++) {
         def currentImage = images[i]
-        def primaryName = currentImage.names[0]
-
-        buildDockerImage(primaryName, version, currentImage.dockerFile, jfrogCliRepoDir)
-        pushDockerImageVersionAndRelease(primaryName, version)
-
-        // Push alternative tags if needed.
-        for (int n = 1; n < currentImage.names.size(); n++) {
-            def newName = currentImage.names[n]
-            // Create new tag.
-            sh """#!/bin/bash
-                docker tag $primaryName:$version $newName:$version
-            """
-            pushDockerImageVersionAndRelease(newName, version)
+        def imgName = currentImage.name
+        if ($cliExecutableName == 'jf') {
+            imgName="${imgName}-jf"
         }
+
+        buildDockerImage(imgName, version, currentImage.dockerFile, jfrogCliRepoDir)
+        pushDockerImageVersionAndRelease(imgName, version)
     }
 }
 
 def buildDockerImage(name, version, dockerFile, jfrogCliRepoDir) {
     dir("$jfrogCliRepoDir") {
         sh """#!/bin/bash
-            docker build --tag=$name:$version -f $dockerFile .
+            docker build --build-arg cliExecutableName=$cliExecutableName --tag=$name:$version -f $dockerFile .
         """
     }
 }
@@ -183,9 +194,9 @@ def pushDockerImageVersionAndRelease(name, version) {
     withCredentials([string(credentialsId: 'jfrog-cli-automation', variable: 'JFROG_CLI_AUTOMATION_ACCESS_TOKEN')]) {
         options = "--url https://releases.jfrog.io/artifactory --access-token=$JFROG_CLI_AUTOMATION_ACCESS_TOKEN"
         sh """#!/bin/bash
-            builder/jfrog rt docker-push $name:$version reg2 $options
+            $builderPath rt docker-push $name:$version reg2 $options
             docker tag $name:$version $name:latest
-            builder/jfrog rt docker-push $name:latest reg2 $options
+            $builderPath rt docker-push $name:latest reg2 $options
         """
     }
 }
@@ -193,7 +204,7 @@ def pushDockerImageVersionAndRelease(name, version) {
 def uploadGetCliToJfrogReleases() {
     withCredentials([string(credentialsId: 'jfrog-cli-automation', variable: 'JFROG_CLI_AUTOMATION_ACCESS_TOKEN')]) {
         sh """#!/bin/bash
-                builder/jfrog rt u $jfrogCliRepoDir/build/getCli.sh jfrog-cli/v2/scripts/ --url https://releases.jfrog.io/artifactory/ --access-token=$JFROG_CLI_AUTOMATION_ACCESS_TOKEN --flat
+                $builderPath rt u $jfrogCliRepoDir/build/getCli-$cliExecutableName.sh $basePathInReleases/scripts/getCli.sh --url https://releases.jfrog.io/artifactory/ --access-token=$JFROG_CLI_AUTOMATION_ACCESS_TOKEN --flat
         """
     }   
 }
@@ -201,7 +212,7 @@ def uploadGetCliToJfrogReleases() {
 def uploadBinaryToJfrogReleases(pkg, fileName) {
     withCredentials([string(credentialsId: 'jfrog-cli-automation', variable: 'JFROG_CLI_AUTOMATION_ACCESS_TOKEN')]) {
         sh """#!/bin/bash
-                builder/jfrog rt u $jfrogCliRepoDir/$fileName jfrog-cli/v2/$version/$pkg/ --url https://releases.jfrog.io/artifactory/ --access-token=$JFROG_CLI_AUTOMATION_ACCESS_TOKEN --flat
+                $builderPath rt u $jfrogCliRepoDir/$fileName $basePathInReleases/$version/$pkg/ --url https://releases.jfrog.io/artifactory/ --access-token=$JFROG_CLI_AUTOMATION_ACCESS_TOKEN --flat
         """
     }   
 }
@@ -232,7 +243,7 @@ def build(goos, goarch, pkg, fileName) {
 
 def buildAndUpload(goos, goarch, pkg, fileExtension) {
     def extension = fileExtension == null ? '' : fileExtension
-    def fileName = "jfrog$fileExtension"
+    def fileName = "$cliExecutableName$fileExtension"
 
     build(goos, goarch, pkg, fileName)
     uploadBinaryToJfrogReleases(pkg, fileName)
@@ -240,7 +251,7 @@ def buildAndUpload(goos, goarch, pkg, fileExtension) {
 }
 
 def publishNpmPackage(jfrogCliRepoDir) {
-    dir(jfrogCliRepoDir+'build/npm/') {
+    dir(jfrogCliRepoDir+"build/npm/$majorVersion-$cliExecutableName") {
         withCredentials([string(credentialsId: 'npm-authorization', variable: 'NPM_AUTH_TOKEN')]) {
             sh '''#!/bin/bash
                 apt update
@@ -259,11 +270,11 @@ def publishNpmPackage(jfrogCliRepoDir) {
 
 def publishChocoPackage(version, jfrogCliRepoDir, architectures) {
     def architecture = architectures.find { it.goos == 'windows' && it.goarch == 'amd64' }
-    build(architecture.goos, architecture.goarch, architecture.pkg, 'jfrog.exe')
+    build(architecture.goos, architecture.goarch, architecture.pkg, "$cliExecutableName.exe")
     dir(jfrogCliRepoDir+'build/chocolatey') {
         withCredentials([string(credentialsId: 'choco-api-key', variable: 'CHOCO_API_KEY')]) {
             sh """#!/bin/bash
-                mv $jfrogCliRepoDir/jfrog.exe $jfrogCliRepoDir/build/chocolatey/tools
+                mv $jfrogCliRepoDir/$cliExecutableName.exe $jfrogCliRepoDir/build/chocolatey/tools
                 cp $jfrogCliRepoDir/LICENSE $jfrogCliRepoDir/build/chocolatey/tools
                 docker run -v \$PWD:/work -w /work $architecture.chocoImage pack version=$version
                 docker run -v \$PWD:/work -w /work $architecture.chocoImage push --apiKey \$CHOCO_API_KEY jfrog-cli.${version}.nupkg

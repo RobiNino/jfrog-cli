@@ -10,8 +10,10 @@ tmp
 out
 
 # JFrog executable
-jfrog
-jfrog.exe
+#jf
+#jf.exe
+#jfrog
+#jfrog.exe
 
 # Vim
 *~
@@ -23,3 +25,6 @@ jfrog.exe
 # Chocolatey build files
 build/chocolatey/tools/LICENSE
 *.nupkg
+
+# npm build files
+*/node_modules
