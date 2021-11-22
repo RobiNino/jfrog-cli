@@ -2,7 +2,7 @@
 
 if [ $# -eq 0 ]
   then
-	exe_name="jf"
+	exe_name="jfrog"
   else
 	exe_name="$1"
 fi
