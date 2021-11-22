@@ -21,6 +21,7 @@ node("docker") {
     env.PATH+=":${goRoot}/bin"
     env.GO111MODULE="on"
     env.JFROG_CLI_OFFER_CONFIG="false"
+    env.CI="true"
 
     dir('temp') {
         cliWorkspace = pwd()
