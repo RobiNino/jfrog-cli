@@ -42,9 +42,9 @@ node("docker") {
             }
         }
 
-        stage('Release jf executables') {
-            runRelease(architectures)
-        }
+        //stage('Release jf executables') {
+        //    runRelease(architectures)
+        //}
 
         stage('Release jfrog executables') {
             cliExecutableName = 'jfrog'
@@ -81,18 +81,18 @@ def runRelease(architectures) {
                 dockerLogin()
             }
 
-            stage('Build and publish rpm and debian') {
-                buildRpmAndDeb(version, architectures)
-            }
-
-            // Skipping publishing jf choco package till it will be verified.
-            if (cliExecutableName == 'jfrog') {
-                // Download cert files, to be used for signing the Windows executable, packaged by Chocolatey.
-                downloadToolsCert()
-                stage('Build and publish Chocolatey') {
-                    publishChocoPackage(version, jfrogCliRepoDir, architectures)
-                }
-            }
+            //stage('Build and publish rpm and debian') {
+            //    buildRpmAndDeb(version, architectures)
+            //}
+//
+            //// Skipping publishing jf choco package till it will be verified.
+            //if (cliExecutableName == 'jfrog') {
+            //    // Download cert files, to be used for signing the Windows executable, packaged by Chocolatey.
+            //    downloadToolsCert()
+            //    stage('Build and publish Chocolatey') {
+            //        publishChocoPackage(version, jfrogCliRepoDir, architectures)
+            //    }
+            //}
 
             stage('Npm publish') {
                 publishNpmPackage(jfrogCliRepoDir)
