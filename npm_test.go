@@ -117,7 +117,7 @@ func testNpm(t *testing.T, isLegacy bool) {
 				npmTest.moduleName = readModuleId(t, npmTest.wd, npmVersion)
 				runJfrogCli(t, commandArgs...)
 			}
-			validateNpmLocalBuildInfo(t, tests.NpmBuildName, buildNumber, npmTest.moduleName)
+			validatePartialsBuildInfo(t, tests.NpmBuildName, buildNumber, npmTest.moduleName)
 			assert.NoError(t, artifactoryCli.Exec("bp", tests.NpmBuildName, buildNumber))
 			npmTest.buildNumber = buildNumber
 			npmTest.validationFunc(t, npmTest, isNpm7)
@@ -146,7 +146,7 @@ func TestNpmWithGlobalConfig(t *testing.T) {
 	npmProjectPath := initGlobalNpmFilesTest(t)
 	clientTestUtils.ChangeDirAndAssert(t, filepath.Dir(npmProjectPath))
 	runJfrogCli(t, "npm", "install", "--build-name="+tests.NpmBuildName, "--build-number=1", "--module="+ModuleNameJFrogTest)
-	validateNpmLocalBuildInfo(t, tests.NpmBuildName, "1", ModuleNameJFrogTest)
+	validatePartialsBuildInfo(t, tests.NpmBuildName, "1", ModuleNameJFrogTest)
 }
 
 func TestNpmConditionalUpload(t *testing.T) {
@@ -167,17 +167,13 @@ func TestNpmConditionalUpload(t *testing.T) {
 	testConditionalUpload(t, execFunc, tests.SearchAllNpm)
 }
 
-func validateNpmLocalBuildInfo(t *testing.T, buildName, buildNumber, moduleName string) {
-	buildInfoService := utils.CreateBuildInfoService()
-	npmBuild, err := buildInfoService.GetOrCreateBuildWithProject(buildName, buildNumber, "")
+func validatePartialsBuildInfo(t *testing.T, buildName, buildNumber, moduleName string) {
+	partials, err := utils.ReadPartialBuildInfoFiles(buildName, buildNumber, "")
 	assert.NoError(t, err)
-	bi, err := npmBuild.ToBuildInfo()
-	assert.NoError(t, err)
-	assert.NotEmpty(t, bi.Started)
-	assert.NotEmpty(t, bi.Modules)
-	for _, module := range bi.Modules {
-		assert.Equal(t, moduleName, module.Id)
-		assert.Equal(t, buildinfo.Npm, module.Type)
+	for _, module := range partials {
+		assert.Equal(t, moduleName, module.ModuleId)
+		assert.Equal(t, buildinfo.Npm, module.ModuleType)
+		assert.NotZero(t, module.Timestamp)
 	}
 }
 
@@ -443,7 +439,7 @@ func TestYarn(t *testing.T) {
 	jfrogCli := tests.NewJfrogCli(execMain, "jfrog", "")
 	assert.NoError(t, jfrogCli.Exec("yarn", "--build-name="+tests.YarnBuildName, "--build-number=1", "--module="+ModuleNameJFrogTest))
 
-	validateNpmLocalBuildInfo(t, tests.YarnBuildName, "1", ModuleNameJFrogTest)
+	validatePartialsBuildInfo(t, tests.YarnBuildName, "1", ModuleNameJFrogTest)
 
 	assert.NoError(t, artifactoryCli.WithoutCredentials().Exec("bp", tests.YarnBuildName, "1"))
 	publishedBuildInfo, found, err := tests.GetBuildInfo(serverDetails, tests.YarnBuildName, "1")
