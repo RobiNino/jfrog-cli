@@ -154,7 +154,6 @@ func TestNpmConditionalUpload(t *testing.T) {
 	defer cleanNpmTest(t)
 	wd, err := os.Getwd()
 	assert.NoError(t, err, "Failed to get current dir")
-	defer clientTestUtils.ChangeDirAndAssert(t, wd)
 	npmProjectPath := initNpmProjectTest(t)
 	clientTestUtils.ChangeDirAndAssert(t, filepath.Dir(npmProjectPath))
 	buildName := tests.NpmBuildName + "-scan"
@@ -162,6 +161,7 @@ func TestNpmConditionalUpload(t *testing.T) {
 	runJfrogCli(t, []string{"npm", "install", "--build-name=" + buildName, "--build-number=" + buildNumber}...)
 
 	execFunc := func() error {
+		defer clientTestUtils.ChangeDirAndAssert(t, wd)
 		return runJfrogCliWithoutAssertion([]string{"npm", "publish", "--scan", "--build-name=" + buildName, "--build-number=" + buildNumber}...)
 	}
 	testConditionalUpload(t, execFunc, tests.SearchAllNpm)
