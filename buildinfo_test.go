@@ -325,6 +325,9 @@ func TestDownloadAppendedBuild(t *testing.T) {
 	inttestutils.DeleteBuild(serverDetails.ArtifactoryUrl, tests.RtBuildName1, artHttpDetails)
 	inttestutils.DeleteBuild(serverDetails.ArtifactoryUrl, tests.RtBuildName2, artHttpDetails)
 
+	// Clean filesystem from previous failed tests
+	tests.CleanFileSystem()
+
 	// Add files to RtBuildName1/buildNumber1.
 	specFile, err := tests.CreateSpec(tests.SplitUploadSpecA)
 	assert.NoError(t, err)
