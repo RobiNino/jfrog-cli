@@ -342,9 +342,11 @@ func TestDownloadAppendedBuild(t *testing.T) {
 	// Clean filesystem from previous failed tests
 	log.Info("before clean")
 	paths, _ := fileutils.ListFilesRecursiveWalkIntoDirSymlink(tests.Out, false)
+	log.Info(paths)
 	tests.CleanFileSystem()
 	log.Info("after clean")
 	paths, _ = fileutils.ListFilesRecursiveWalkIntoDirSymlink(tests.Out, false)
+	log.Info(paths)
 
 	// Download
 	runRt(t, "dl", tests.RtRepo1, filepath.Join(tests.Out, "download", "simple_by_build")+fileutils.GetFileSeparator(), "--build="+tests.RtBuildName2+"/"+buildNumber2)
