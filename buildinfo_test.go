@@ -340,13 +340,17 @@ func TestDownloadAppendedBuild(t *testing.T) {
 	runRt(t, "bp", tests.RtBuildName2, buildNumber2)
 
 	// Clean filesystem from previous failed tests
+	log.Info("before clean")
+	paths, _ := fileutils.ListFilesRecursiveWalkIntoDirSymlink(tests.Out, false)
 	tests.CleanFileSystem()
+	log.Info("after clean")
+	paths, _ = fileutils.ListFilesRecursiveWalkIntoDirSymlink(tests.Out, false)
 
 	// Download
 	runRt(t, "dl", tests.RtRepo1, filepath.Join(tests.Out, "download", "simple_by_build")+fileutils.GetFileSeparator(), "--build="+tests.RtBuildName2+"/"+buildNumber2)
 
 	// Validate files from
-	paths, _ := fileutils.ListFilesRecursiveWalkIntoDirSymlink(tests.Out, false)
+	paths, _ = fileutils.ListFilesRecursiveWalkIntoDirSymlink(tests.Out, false)
 	err = tests.ValidateListsIdentical(tests.GetBuildSimpleDownloadNoPattern(), paths)
 	assert.NoError(t, err)
 
