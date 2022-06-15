@@ -19,6 +19,7 @@ import (
 	"github.com/jfrog/jfrog-cli/general/envsetup"
 	"github.com/jfrog/jfrog-cli/general/project"
 	transferCommand "github.com/jfrog/jfrog-cli/general/transfer"
+	"github.com/jfrog/jfrog-cli/general/transfer/upload"
 	"github.com/jfrog/jfrog-cli/missioncontrol"
 	"github.com/jfrog/jfrog-cli/plugins"
 	"github.com/jfrog/jfrog-cli/plugins/utils"
@@ -244,6 +245,22 @@ func getCommands() []cli.Command {
 			Hidden:       true,
 			Action: func(c *cli.Context) error {
 				return transferCommand.RunTransfer(c)
+			},
+		},
+		{
+			Name:     "transfer-upload",
+			Category: otherCategory,
+			Hidden:   true,
+			Action: func(c *cli.Context) error {
+				return upload.RunTransferUploadChunk(c)
+			},
+		},
+		{
+			Name:     "transfer-aql",
+			Category: otherCategory,
+			Hidden:   true,
+			Action: func(c *cli.Context) error {
+				return upload.RunAqlCheck(c)
 			},
 		},
 	}

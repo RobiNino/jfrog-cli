@@ -10,7 +10,7 @@ require (
 	github.com/jfrog/build-info-go v1.2.6
 	github.com/jfrog/gofrog v1.1.1
 	github.com/jfrog/jfrog-cli-core/v2 v2.13.6
-	github.com/jfrog/jfrog-client-go v1.12.5
+	github.com/jfrog/jfrog-client-go v1.13.1
 	github.com/jszwec/csvutil v1.6.0
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/pkg/errors v0.9.1
@@ -88,13 +88,13 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.0 // indirect
 )
 
 replace github.com/jfrog/build-info-go => github.com/jfrog/build-info-go v1.2.7-0.20220510151507-12e2f448f35d
 
-replace github.com/jfrog/jfrog-client-go => github.com/RobiNino/jfrog-client-go v0.0.0-20220518093655-01c80cecbf70
+replace github.com/jfrog/jfrog-client-go => /Users/robin/proj/jfrog-client-go
 
-replace github.com/jfrog/jfrog-cli-core/v2 => github.com/jfrog/jfrog-cli-core/v2 v2.13.7-0.20220517130951-b3695fae482a
+replace github.com/jfrog/jfrog-cli-core/v2 => /Users/robin/proj/jfrog-cli-core
 
-replace github.com/jfrog/gofrog => github.com/RobiNino/gofrog v1.0.7-0.20220518100944-4660d2bf0844
+replace github.com/jfrog/gofrog => github.com/jfrog/gofrog v1.1.3-0.20220609090345-e2ba7822cab2
