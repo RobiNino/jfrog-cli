@@ -91,6 +91,7 @@ func uploadChunkAndAddTokenIfNeeded(srcUpService *srcUserPluginService, chunk Up
 	if err != nil {
 		return err
 	}
+	// Empty token is returned if all files were checksum deployed.
 	if uuidToken != "" {
 		// Add token to polling.
 		uploadTokensChan <- uuidToken

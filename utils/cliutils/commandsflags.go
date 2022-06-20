@@ -77,7 +77,6 @@ const (
 	GroupAddUsers          = "group-add-users"
 	GroupDelete            = "group-delete"
 	passphrase             = "passphrase"
-	Transfer               = "transfer"
 
 	// Distribution's Command Keys
 	ReleaseBundleCreate     = "release-bundle-create"
@@ -114,6 +113,9 @@ const (
 
 	// Project commands keys
 	InitProject = "project-init"
+
+	// Transfer commands keys
+	Transfer = "transfer"
 
 	// *** Artifactory Commands' flags ***
 	// Base flags
@@ -453,6 +455,9 @@ const (
 
 	// Setup flags
 	setupFormat = "setup-format"
+
+	// *** Transfer Commands' flags ***
+	Filestore = "filestore"
 )
 
 var flagsMap = map[string]cli.Flag{
@@ -1301,6 +1306,10 @@ var flagsMap = map[string]cli.Flag{
 		Name:   "format",
 		Hidden: true,
 	},
+	Filestore: cli.BoolFlag{
+		Name:  Filestore,
+		Usage: "[Default: false] Set to true to make the transfer mechanism check for the existence of artifacts in the filestore. Used when the database was loaded separately and was not index.` `",
+	},
 }
 
 var commandFlags = map[string][]string{
@@ -1560,7 +1569,7 @@ var commandFlags = map[string][]string{
 		url, user, password, accessToken, sshPassphrase, sshKeyPath, serverId, deleteQuiet,
 	},
 	Transfer: {
-		url, user, password, accessToken, sshPassphrase, sshKeyPath, serverId, threads, retries, retryWaitTime,
+		Filestore,
 	},
 	// Xray's commands
 	OfflineUpdate: {

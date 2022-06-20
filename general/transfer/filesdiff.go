@@ -13,11 +13,12 @@ import (
 const searchTimeFramesMinutes = 15
 
 type filesDiffPhase struct {
-	repoKey         string
-	startTime       time.Time
-	srcUpService    *srcUserPluginService
-	srcRtDetails    *coreConfig.ServerDetails
-	targetRtDetails *coreConfig.ServerDetails
+	repoKey                   string
+	checkExistenceInFilestore bool
+	startTime                 time.Time
+	srcUpService              *srcUserPluginService
+	srcRtDetails              *coreConfig.ServerDetails
+	targetRtDetails           *coreConfig.ServerDetails
 }
 
 func (f filesDiffPhase) getPhaseName() string {
@@ -29,8 +30,12 @@ func (f filesDiffPhase) getPhaseNumber() int {
 }
 
 func (f filesDiffPhase) phaseStarted() error {
-	f.startTime = time.Now()
 	// TODO notify progress
+	f.startTime = time.Now()
+	err := addNewDiffToState(f.repoKey, f.startTime)
+	if err != nil {
+		return err
+	}
 	return setFilesDiffHandlingStarted(f.repoKey, f.startTime)
 }
 
@@ -41,6 +46,14 @@ func (f filesDiffPhase) phaseDone() error {
 
 func (f filesDiffPhase) setRepoKey(repoKey string) {
 	f.repoKey = repoKey
+}
+
+func (f filesDiffPhase) shouldSkipPhase(repoKey string) (bool, error) {
+	return false, nil
+}
+
+func (f filesDiffPhase) shouldCheckExistenceInFilestore(shouldCheck bool) {
+	f.checkExistenceInFilestore = shouldCheck
 }
 
 func (f filesDiffPhase) setSrcUserPluginService(service *srcUserPluginService) {
@@ -56,9 +69,7 @@ func (f filesDiffPhase) setTargetDetails(details *coreConfig.ServerDetails) {
 }
 
 func (f filesDiffPhase) run() error {
-	// todo add check if previous diff failed.
-	// todo get last migration / diff completion time
-	completionTime, err := getRepoMigratedCompletionTime(f.repoKey)
+	diffStart, diffEnd, err := getDiffHandlingRange(f.repoKey)
 	if err != nil {
 		return err
 	}
@@ -76,8 +87,8 @@ func (f filesDiffPhase) run() error {
 			uploadTokensChan: uploadTokensChan,
 		}
 
-		curDiffTimeFrame := completionTime
-		for f.startTime.Sub(curDiffTimeFrame) > 0 {
+		curDiffTimeFrame := diffEnd
+		for diffStart.Sub(curDiffTimeFrame) > 0 {
 			diffTimeFrameHandler := f.createDiffTimeFrameHandlerFunc(pcDetails)
 			_, _ = producerConsumer.AddTaskWithError(diffTimeFrameHandler(timeFrameParams{repoKey: f.repoKey, fromTime: curDiffTimeFrame}), errorsQueue.AddError)
 			curDiffTimeFrame = curDiffTimeFrame.Add(searchTimeFramesMinutes * time.Minute)
@@ -137,7 +148,10 @@ func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgP
 		return nil
 	}
 
-	curUploadChunk := UploadChunk{TargetAuth: createTargetAuth(f.targetRtDetails)}
+	curUploadChunk := UploadChunk{
+		TargetAuth:                createTargetAuth(f.targetRtDetails),
+		CheckExistenceInFilestore: f.checkExistenceInFilestore,
+	}
 
 	for _, item := range result.Results {
 		if item.Name == "." {
@@ -146,7 +160,7 @@ func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgP
 		if item.Type == "folder" {
 			// todo ?
 		} else {
-			curUploadChunk.appendUploadCandidate(item)
+			curUploadChunk.appendUploadCandidate(item.Repo, item.Path, item.Name)
 			if len(curUploadChunk.UploadCandidates) == uploadChunkSize {
 				err := uploadChunkAndAddTokenIfNeeded(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
 				if err != nil {

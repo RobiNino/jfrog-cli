@@ -20,17 +20,17 @@ import (
 	"time"
 )
 
-const serverID = "transfer"
+const serverID = "transfer-david"
 
 var m sync.Mutex
 var filesUploaded = 0
 var serverDetails *config.ServerDetails
 var startTime time.Time
 
-const uploadVer = "v4"
+const uploadVer = "v0"
 const maxLevel = 10
 const filesPerDir = 100
-const dirsPerLevel = 2
+const dirsPerLevel = 5
 const threads = 64
 
 func RunTransferUploadChunk(c *cli.Context) error {
@@ -62,6 +62,10 @@ func RunTransferUploadChunk(c *cli.Context) error {
 	}()
 	// Blocked until finish consuming
 	producerConsumer.Run()
+
+	if runnerErr != nil {
+		return runnerErr
+	}
 
 	log.Output("filesUploaded:", filesUploaded)
 	log.Output("time elapsed:", time.Since(startTime))

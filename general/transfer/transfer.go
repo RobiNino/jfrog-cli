@@ -13,32 +13,10 @@ import (
 )
 
 const (
-	iso8601TimeFormat = "2006-01-02T15:04:05Z0700"
-	tasksMaxCapacity  = 500000
-	uploadChunkSize   = 10
-	defaultThreads    = 10
+	tasksMaxCapacity = 500000
+	uploadChunkSize  = 10
+	defaultThreads   = 10
 )
-
-// TODO remove:
-// unix timestamp: strconv.FormatInt(startTime.Unix(), 10)
-// var startTime time.Time
-
-/* todo remove
-var tempDir string
-
-tempDir, err = fileutils.CreateTempDir()
-log.Info("Created temp directory at:", tempDir)
-if err != nil {
-return err
-}
-defer func() {
-	e := fileutils.RemoveTempDir(tempDir)
-	if err == nil {
-		err = e
-	}
-}()
-
-*/
 
 func RunTransfer(c *cli.Context) (err error) {
 	if c.NArg() != 3 {
@@ -79,23 +57,21 @@ func RunTransfer(c *cli.Context) (err error) {
 			var newPhase transferPhase
 			switch phaseI {
 			case 1:
-				// TODO Might want to move from here.
-				migrated, err := isRepoMigrated(repo.Key)
-				if err != nil {
-					return err
-				}
-				if migrated {
-					continue
-				}
-
 				newPhase = migrationPhase{}
 			case 2:
 				newPhase = filesDiffPhase{}
 			case 3:
 				newPhase = propertiesDiffPhase{}
 			}
-			tc.initNewPhase(newPhase, repo.Key, srcUpService)
 			// TODO handle errors
+			skip, err := newPhase.shouldSkipPhase(repo.Key)
+			if err != nil {
+				log.Error(err)
+			}
+			if skip {
+				continue
+			}
+			tc.initNewPhase(newPhase, repo.Key, srcUpService)
 			err = newPhase.phaseStarted()
 			if err != nil {
 				log.Error(err)
@@ -115,18 +91,20 @@ func RunTransfer(c *cli.Context) (err error) {
 
 func (tc *transferCommandConfig) initNewPhase(newPhase transferPhase, repoKey string, srcUpService *srcUserPluginService) {
 	newPhase.setRepoKey(repoKey)
+	newPhase.shouldCheckExistenceInFilestore(tc.checkExistenceInFilestore)
 	newPhase.setSourceDetails(tc.sourceRtDetails)
 	newPhase.setTargetDetails(tc.targetRtDetails)
 	newPhase.setSrcUserPluginService(srcUpService)
 }
 
 type transferCommandConfig struct {
-	sourceRtDetails        *coreConfig.ServerDetails
-	targetRtDetails        *coreConfig.ServerDetails
-	repository             string
-	threads                int
-	retries                int
-	retryWaitTimeMilliSecs int
+	sourceRtDetails           *coreConfig.ServerDetails
+	targetRtDetails           *coreConfig.ServerDetails
+	checkExistenceInFilestore bool
+	repository                string
+	threads                   int
+	retries                   int
+	retryWaitTimeMilliSecs    int
 }
 
 type producerConsumerDetails struct {
@@ -177,16 +155,19 @@ func (tc *transferCommandConfig) printSummary(sourceRepo string, timeElapsed tim
 }
 
 func getCommandConfig(c *cli.Context) (tc transferCommandConfig, err error) {
-	tc.sourceRtDetails, err = coreCommonCommands.GetConfig(c.Args().Get(0), false)
+	tc.sourceRtDetails, err = coreCommonCommands.GetConfig(c.Args().Get(0), true)
 	if err != nil {
 		return tc, err
 	}
 
-	tc.targetRtDetails, err = coreCommonCommands.GetConfig(c.Args().Get(1), false)
+	tc.targetRtDetails, err = coreCommonCommands.GetConfig(c.Args().Get(1), true)
 	if err != nil {
 		return tc, err
 	}
 
+	tc.checkExistenceInFilestore = c.Bool(cliutils.Filestore)
+
+	// todo is needed:
 	tc.repository = c.Args().Get(2)
 
 	tc.threads, err = cliutils.GetThreadsCount(c, 16)

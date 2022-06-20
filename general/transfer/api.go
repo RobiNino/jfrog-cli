@@ -2,14 +2,13 @@ package transfer
 
 import (
 	"encoding/json"
-	"github.com/jfrog/jfrog-client-go/artifactory/services/utils"
 )
 
-type ChunkStatusType string
+type ProcessStatusType string
 
 const (
-	Done      ChunkStatusType = "DONE"
-	InProcess ChunkStatusType = "IN_PROCESS"
+	Done       ProcessStatusType = "DONE"
+	InProgress ProcessStatusType = "IN_PROGRESS"
 )
 
 type ChunkFileStatusType string
@@ -17,6 +16,8 @@ type ChunkFileStatusType string
 const (
 	Success ChunkFileStatusType = "SUCCESS"
 	Fail    ChunkFileStatusType = "FAIL"
+	// todo use
+	SkippedLargeProps ChunkFileStatusType = "SKIPPED_LARGE_PROPS"
 )
 
 type TargetAuth struct {
@@ -35,10 +36,10 @@ type HandlePropertiesDiff struct {
 
 type HandlePropertiesDiffResponse struct {
 	NodeIdResponse
-	PropertiesDelivered json.Number     `json:"properties_delivered,omitempty"`
-	PropertiesRemained  json.Number     `json:"properties_remained,omitempty"`
-	Status              ChunkStatusType `json:"status,omitempty"`
-	Errors              string          `json:"errors,omitempty"`
+	PropertiesDelivered json.Number       `json:"properties_delivered,omitempty"`
+	PropertiesTotal     json.Number       `json:"properties_total,omitempty"`
+	Status              ProcessStatusType `json:"status,omitempty"`
+	Errors              string            `json:"errors,omitempty"`
 }
 
 type PropertiesHandlingError struct {
@@ -49,7 +50,8 @@ type PropertiesHandlingError struct {
 
 type UploadChunk struct {
 	TargetAuth
-	UploadCandidates []FileRepresentation `json:"upload_candidates,omitempty"`
+	CheckExistenceInFilestore bool                 `json:"check_existence_in_filestore,omitempty"`
+	UploadCandidates          []FileRepresentation `json:"upload_candidates,omitempty"`
 }
 
 type FileRepresentation struct {
@@ -74,7 +76,7 @@ type UploadChunksStatusResponse struct {
 
 type ChunkStatus struct {
 	UuidTokenResponse
-	Status ChunkStatusType            `json:"status,omitempty"`
+	Status ProcessStatusType          `json:"status,omitempty"`
 	Files  []FileUploadStatusResponse `json:"files,omitempty"`
 }
 
@@ -106,6 +108,6 @@ func (ucs *UploadChunksStatusBody) fillTokensBatch(uploadTokensChan chan string)
 	}
 }
 
-func (uc *UploadChunk) appendUploadCandidate(item utils.ResultItem) {
-	uc.UploadCandidates = append(uc.UploadCandidates, FileRepresentation{Repo: item.Repo, Path: item.Path, Name: item.Name})
+func (uc *UploadChunk) appendUploadCandidate(repo, path, name string) {
+	uc.UploadCandidates = append(uc.UploadCandidates, FileRepresentation{Repo: repo, Path: path, Name: name})
 }

@@ -8,7 +8,9 @@ type transferPhase interface {
 	run() error
 	phaseStarted() error
 	phaseDone() error
-	setRepoKey(string)
+	setRepoKey(repoKey string)
+	shouldCheckExistenceInFilestore(bool)
+	shouldSkipPhase(repoKey string) (bool, error)
 	setSrcUserPluginService(*srcUserPluginService)
 	setSourceDetails(*coreConfig.ServerDetails)
 	setTargetDetails(*coreConfig.ServerDetails)

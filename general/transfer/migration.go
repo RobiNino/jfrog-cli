@@ -12,11 +12,12 @@ import (
 )
 
 type migrationPhase struct {
-	repoKey         string
-	startTime       time.Time
-	srcUpService    *srcUserPluginService
-	srcRtDetails    *coreConfig.ServerDetails
-	targetRtDetails *coreConfig.ServerDetails
+	repoKey                   string
+	checkExistenceInFilestore bool
+	startTime                 time.Time
+	srcUpService              *srcUserPluginService
+	srcRtDetails              *coreConfig.ServerDetails
+	targetRtDetails           *coreConfig.ServerDetails
 }
 
 func (m migrationPhase) getPhaseName() string {
@@ -46,6 +47,14 @@ func (m migrationPhase) phaseDone() error {
 
 func (m migrationPhase) setRepoKey(repoKey string) {
 	m.repoKey = repoKey
+}
+
+func (m migrationPhase) shouldCheckExistenceInFilestore(shouldCheck bool) {
+	m.checkExistenceInFilestore = shouldCheck
+}
+
+func (m migrationPhase) shouldSkipPhase(repoKey string) (bool, error) {
+	return isRepoMigrated(repoKey)
 }
 
 func (m migrationPhase) setSrcUserPluginService(service *srcUserPluginService) {
@@ -117,6 +126,7 @@ func (m migrationPhase) createFolderMigrationHandlerFunc(pcDetails producerConsu
 }
 
 func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, pcDetails producerConsumerDetails) error {
+	// todo fix log:
 	log.Info(logMsgPrefix+"Visited folder:", path.Join(params.repoKey, params.relativePath))
 
 	result, err := m.getDirectoryContentsAql(params.repoKey, params.relativePath)
@@ -124,11 +134,10 @@ func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, 
 		return err
 	}
 
-	if len(result.Results) == 0 {
-		// TODO implement for empty folder
+	curUploadChunk := UploadChunk{
+		TargetAuth:                createTargetAuth(m.targetRtDetails),
+		CheckExistenceInFilestore: m.checkExistenceInFilestore,
 	}
-
-	curUploadChunk := UploadChunk{TargetAuth: createTargetAuth(m.targetRtDetails)}
 
 	for _, item := range result.Results {
 		if item.Name == "." {
@@ -142,7 +151,7 @@ func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, 
 			folderHandler := m.createFolderMigrationHandlerFunc(pcDetails)
 			_, _ = pcDetails.producerConsumer.AddTaskWithError(folderHandler(folderParams{repoKey: params.repoKey, relativePath: newRelativePath}), pcDetails.errorsQueue.AddError)
 		} else {
-			curUploadChunk.appendUploadCandidate(item)
+			curUploadChunk.appendUploadCandidate(item.Repo, item.Path, item.Name)
 			if len(curUploadChunk.UploadCandidates) == uploadChunkSize {
 				err := uploadChunkAndAddTokenIfNeeded(m.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
 				if err != nil {
@@ -153,6 +162,12 @@ func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, 
 			}
 		}
 	}
+
+	// Empty folder. Add it as candidate.
+	if len(result.Results) == 0 {
+		curUploadChunk.appendUploadCandidate(params.repoKey, path.Dir(params.relativePath), path.Base(params.relativePath))
+	}
+
 	// Chunk didn't reach full size. Upload the remaining files.
 	if len(curUploadChunk.UploadCandidates) > 0 {
 		return uploadChunkAndAddTokenIfNeeded(m.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
@@ -167,6 +182,4 @@ func (m migrationPhase) getDirectoryContentsAql(repoKey, relativePath string) (r
 
 func generateFolderContentsAqlQuery(repoKey, relativePath string) string {
 	return fmt.Sprintf(`items.find({"type":"any","$or":[{"$and":[{"repo":"%s","path":{"$match":"%s"},"name":{"$match":"*"}}]}]}).include("repo","path","name")`, repoKey, relativePath)
-	// todo removed from include to speed up:
-	// ,"created","modified","updated","created_by","modified_by","type","actual_md5","actual_sha1","sha256","size","property","stat"
 }

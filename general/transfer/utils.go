@@ -143,7 +143,7 @@ func pollUploads(srcUpService *srcUserPluginService, uploadTokensChan chan strin
 			return
 		}
 		for _, chunk := range chunksStatus.ChunksStatus {
-			if chunk.Status == InProcess {
+			if chunk.Status == InProgress {
 				continue
 			}
 			for _, file := range chunk.Files {
