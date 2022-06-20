@@ -5,6 +5,7 @@ import (
 	coreCommonCommands "github.com/jfrog/jfrog-cli-core/v2/common/commands"
 	coreConfig "github.com/jfrog/jfrog-cli-core/v2/utils/config"
 	"github.com/jfrog/jfrog-cli/utils/cliutils"
+	"github.com/jfrog/jfrog-client-go/artifactory/services"
 	clientUtils "github.com/jfrog/jfrog-client-go/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
@@ -15,7 +16,7 @@ import (
 const (
 	tasksMaxCapacity = 500000
 	uploadChunkSize  = 10
-	defaultThreads   = 10
+	defaultThreads   = 16
 )
 
 func RunTransfer(c *cli.Context) (err error) {
@@ -47,12 +48,22 @@ func RunTransfer(c *cli.Context) (err error) {
 	}
 
 	// todo create repo list here (include exclude)
-	repos, err := tc.getAllLocalRepositories()
+	srcRepos, err := tc.getAllSrcLocalRepositories()
 	if err != nil {
 		return err
 	}
 
-	for _, repo := range *repos {
+	targetRepos, err := tc.getAllTargetLocalRepositories()
+	if err != nil {
+		return err
+	}
+
+	for _, repo := range *srcRepos {
+		exists := verifyRepoExistsInTarget(targetRepos, repo.Key)
+		if !exists {
+			// TODO log error.
+			continue
+		}
 		for phaseI := 1; phaseI <= numberOfPhases; phaseI++ {
 			var newPhase transferPhase
 			switch phaseI {
@@ -87,6 +98,15 @@ func RunTransfer(c *cli.Context) (err error) {
 		}
 	}
 	return
+}
+
+func verifyRepoExistsInTarget(targetRepos *[]services.RepositoryDetails, srcRepoKey string) bool {
+	for _, targetRepo := range *targetRepos {
+		if targetRepo.Key == srcRepoKey {
+			return true
+		}
+	}
+	return false
 }
 
 func (tc *transferCommandConfig) initNewPhase(newPhase transferPhase, repoKey string, srcUpService *srcUserPluginService) {

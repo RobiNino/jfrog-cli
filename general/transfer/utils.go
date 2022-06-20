@@ -8,6 +8,7 @@ import (
 	artifactoryUtils "github.com/jfrog/jfrog-client-go/artifactory/services/utils"
 	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"io/ioutil"
+	"sync"
 	"time"
 )
 
@@ -69,8 +70,16 @@ func createPropsServiceManager(serverDetails *coreConfig.ServerDetails) (*servic
 	return propsService, nil
 }
 
-func (tc *transferCommandConfig) getAllLocalRepositories() (*[]services.RepositoryDetails, error) {
-	serviceManager, err := utils.CreateServiceManager(tc.sourceRtDetails, -1, 0, false)
+func (tc *transferCommandConfig) getAllSrcLocalRepositories() (*[]services.RepositoryDetails, error) {
+	return tc.getAllLocalRepositories(tc.sourceRtDetails)
+}
+
+func (tc *transferCommandConfig) getAllTargetLocalRepositories() (*[]services.RepositoryDetails, error) {
+	return tc.getAllLocalRepositories(tc.targetRtDetails)
+}
+
+func (tc *transferCommandConfig) getAllLocalRepositories(serverDetails *coreConfig.ServerDetails) (*[]services.RepositoryDetails, error) {
+	serviceManager, err := utils.CreateServiceManager(serverDetails, -1, 0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -117,6 +126,11 @@ func createTargetAuth(targetRtDetails *coreConfig.ServerDetails) TargetAuth {
 	return targetAuth
 }
 
+// This variable holds the number of upload chunk that was sent to the user plugin to process.
+// Together with this mutex, they control the load on the user plugin and couple it to the local number of threads.
+var curProcessedUploadChunks = 0
+var processedUploadChunksMutex sync.Mutex
+
 func pollUploads(srcUpService *srcUserPluginService, uploadTokensChan chan string, doneChan chan bool) {
 	curTokensBatch := UploadChunksStatusBody{}
 
@@ -126,6 +140,9 @@ func pollUploads(srcUpService *srcUserPluginService, uploadTokensChan chan strin
 		curTokensBatch.fillTokensBatch(uploadTokensChan)
 
 		if len(curTokensBatch.UuidTokens) == 0 {
+			if curProcessedUploadChunks != 0 {
+				// TODO handle
+			}
 			select {
 			case done := <-doneChan:
 				if done {
@@ -143,17 +160,96 @@ func pollUploads(srcUpService *srcUserPluginService, uploadTokensChan chan strin
 			return
 		}
 		for _, chunk := range chunksStatus.ChunksStatus {
-			if chunk.Status == InProgress {
+			switch chunk.Status {
+			case InProgress:
 				continue
-			}
-			for _, file := range chunk.Files {
-				if file.Status == Success {
-					// TODO increment progress.
-				} else {
-					// TODO increment progress.
-					// TODO write failure to file.
-				}
+			case Done:
+				reduceCurProcessedChunks()
+				curTokensBatch.UuidTokens = removeTokenFromBatch(curTokensBatch.UuidTokens, chunk.UuidToken)
+				handleFilesOfCompletedChunk(chunk.Files)
 			}
 		}
 	}
+}
+
+func incrCurProcessedChunksWhenPossible() bool {
+	processedUploadChunksMutex.Lock()
+	defer processedUploadChunksMutex.Unlock()
+	if curProcessedUploadChunks <= getThreads() {
+		curProcessedUploadChunks++
+		return true
+	}
+	return false
+}
+
+func reduceCurProcessedChunks() {
+	processedUploadChunksMutex.Lock()
+	defer processedUploadChunksMutex.Unlock()
+	curProcessedUploadChunks--
+}
+
+func removeTokenFromBatch(uuidTokens []string, token string) []string {
+	for i := 0; i < len(uuidTokens); i++ {
+		if token == uuidTokens[i] {
+			return append(uuidTokens[:i], uuidTokens[i+1:]...)
+		}
+	}
+	// todo log unexpected.
+	return uuidTokens
+}
+
+func handleFilesOfCompletedChunk(chunkFiles []FileUploadStatusResponse) {
+	for _, file := range chunkFiles {
+		switch file.Status {
+		case Success:
+			// TODO increment progress.
+		case Fail:
+			// TODO increment progress.
+			addToFailuresConsumableFile(file)
+		case SkippedLargeProps:
+			// TODO increment progress.
+			addToSkippedFile(file)
+		}
+	}
+}
+
+func addToFailuresConsumableFile(file FileUploadStatusResponse) {
+	// TODO implement
+}
+
+func addToSkippedFile(file FileUploadStatusResponse) {
+	// TODO implement
+}
+
+// Uploads chunk when there is room in queue.
+// This is a blocking method.
+func uploadChunkWhenPossible(sup *srcUserPluginService, chunk UploadChunk, uploadTokensChan chan string) error {
+	for {
+		// If increment done, this go routine can proceed to upload the chunk. Otherwise, sleep and try again.
+		isIncr := incrCurProcessedChunksWhenPossible()
+		if !isIncr {
+			time.Sleep(waitTimeBetweenChunkStatusSeconds * time.Second)
+			continue
+		}
+		err := uploadChunkAndAddTokenIfNeeded(sup, chunk, uploadTokensChan)
+		if err != nil {
+			reduceCurProcessedChunks()
+		}
+		return err
+	}
+}
+
+func uploadChunkAndAddTokenIfNeeded(sup *srcUserPluginService, chunk UploadChunk, uploadTokensChan chan string) error {
+	uuidToken, err := sup.uploadChunk(chunk)
+	if err != nil {
+		return err
+	}
+	// Empty token is returned if all files were checksum deployed.
+	if uuidToken != "" {
+		// Add token to polling.
+		uploadTokensChan <- uuidToken
+	} else {
+		// TODO increment progress. If needed increment local counter.
+	}
+	return nil
 }

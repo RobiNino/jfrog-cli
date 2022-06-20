@@ -153,7 +153,7 @@ func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, 
 		} else {
 			curUploadChunk.appendUploadCandidate(item.Repo, item.Path, item.Name)
 			if len(curUploadChunk.UploadCandidates) == uploadChunkSize {
-				err := uploadChunkAndAddTokenIfNeeded(m.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
+				err := uploadChunkWhenPossible(m.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
 				if err != nil {
 					return err
 				}
@@ -170,7 +170,7 @@ func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, 
 
 	// Chunk didn't reach full size. Upload the remaining files.
 	if len(curUploadChunk.UploadCandidates) > 0 {
-		return uploadChunkAndAddTokenIfNeeded(m.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
+		return uploadChunkWhenPossible(m.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
 	}
 	return nil
 }

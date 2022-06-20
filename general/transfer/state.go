@@ -11,8 +11,7 @@ import (
 	"time"
 )
 
-// Internal golang locking for the same process.
-var mutex sync.Mutex
+var stateMutex sync.Mutex
 
 const requestsNumForNodeDetection = 50
 
@@ -106,8 +105,8 @@ func (ts *TransferState) getRepository(repoKey string) *Repository {
 }
 
 func doAndSaveState(action actionOnStateFunc) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	stateMutex.Lock()
+	defer stateMutex.Unlock()
 
 	state, err := getTransferState()
 	if err != nil {

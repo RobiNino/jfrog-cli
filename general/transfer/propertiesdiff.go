@@ -115,7 +115,7 @@ propertiesHandling:
 				continue propertiesHandling
 			}
 		}
-		notifyProgressDone()
+		notifyPropertiesProgressDone()
 		return nil
 	}
 }
@@ -158,7 +158,7 @@ func (phs propsHandlingStatus) updateTotalAndDelivered(localNodeStatus *nodeStat
 	if remoteTotal != localNodeStatus.propertiesTotal {
 		phs.totalPropsToDeliver += remoteTotal - localNodeStatus.propertiesTotal
 		localNodeStatus.propertiesTotal = remoteTotal
-		updateProgressTotal(phs.totalPropsToDeliver)
+		updatePropertiesProgressTotal(phs.totalPropsToDeliver)
 	}
 
 	// Delivered has changed, update it.
@@ -168,7 +168,7 @@ func (phs propsHandlingStatus) updateTotalAndDelivered(localNodeStatus *nodeStat
 		return err
 	}
 	newDeliveries := delivered - localNodeStatus.propertiesDelivered
-	incrementProgress(newDeliveries)
+	incrementPropertiesProgress(newDeliveries)
 	phs.totalPropsDelivered += newDeliveries
 	localNodeStatus.propertiesDelivered = delivered
 	return nil
@@ -187,14 +187,14 @@ func (phs propsHandlingStatus) handleDoneStatus(remoteNodeStatus *HandleProperti
 	return phs.updateTotalAndDelivered(localNodeStatus, remoteNodeStatus)
 }
 
-func updateProgressTotal(newTotal int64) {
+func updatePropertiesProgressTotal(newTotal int64) {
 	// TODO implement
 }
 
-func incrementProgress(incr int64) {
+func incrementPropertiesProgress(incr int64) {
 	// TODO implement
 }
 
-func notifyProgressDone() {
+func notifyPropertiesProgressDone() {
 	// TODO implement
 }

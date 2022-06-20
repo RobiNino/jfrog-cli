@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const serverID = "transfer-david"
+const serverID = "transfer"
 
 var m sync.Mutex
 var filesUploaded = 0
@@ -49,7 +49,7 @@ func RunTransferUploadChunk(c *cli.Context) error {
 	startTime = time.Now()
 
 	go func() {
-		err := handleFolder(folderParams{relativeLocation: "generic-robi", level: 0}, producerConsumer, expectedChan, errorsQueue, folderTasksCounters, fileTasksCounters, 1)
+		err := handleFolder(folderParams{relativeLocation: "transfer-local", level: 0}, producerConsumer, expectedChan, errorsQueue, folderTasksCounters, fileTasksCounters, 1)
 		if err != nil {
 			log.Error(err)
 			return
@@ -149,9 +149,9 @@ func deployFile(uploadService *services.UploadService, fileRelativePath string) 
 	}
 
 	fileDetails := &fileutils.FileDetails{Checksum: entities.Checksum{
-		Sha1:   "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-		Md5:    "d41d8cd98f00b204e9800998ecf8427e",
-		Sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}, Size: 0}
+		Sha1:   "2f6bfbbe9e70350225d02d1879d7cf20d9c9365a",
+		Md5:    "76a9a9dd29dce40d0f148ca87a6cd9c2",
+		Sha256: "0810050960c608872471333227817d9fffc9f08f7cc2258bce150ae2870192fb"}, Size: 0}
 
 	resp, _, err := uploadService.TryChecksumDeploy(fileDetails, targetUrl, uploadService.ArtDetails.CreateHttpClientDetails())
 	if err != nil {

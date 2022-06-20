@@ -162,7 +162,7 @@ func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgP
 		} else {
 			curUploadChunk.appendUploadCandidate(item.Repo, item.Path, item.Name)
 			if len(curUploadChunk.UploadCandidates) == uploadChunkSize {
-				err := uploadChunkAndAddTokenIfNeeded(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
+				err := uploadChunkWhenPossible(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
 				if err != nil {
 					return err
 				}
@@ -173,7 +173,7 @@ func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgP
 	}
 	// Chunk didn't reach full size. Upload the remaining files.
 	if len(curUploadChunk.UploadCandidates) > 0 {
-		return uploadChunkAndAddTokenIfNeeded(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
+		return uploadChunkWhenPossible(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
 	}
 	return nil
 }

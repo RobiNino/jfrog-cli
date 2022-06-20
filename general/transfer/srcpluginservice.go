@@ -86,21 +86,6 @@ func (sup *srcUserPluginService) uploadChunk(chunk UploadChunk) (uuidToken strin
 	return uploadResponse.UuidToken, nil
 }
 
-func uploadChunkAndAddTokenIfNeeded(srcUpService *srcUserPluginService, chunk UploadChunk, uploadTokensChan chan string) error {
-	uuidToken, err := srcUpService.uploadChunk(chunk)
-	if err != nil {
-		return err
-	}
-	// Empty token is returned if all files were checksum deployed.
-	if uuidToken != "" {
-		// Add token to polling.
-		uploadTokensChan <- uuidToken
-	} else {
-		// TODO increment progress. If needed increment local counter.
-	}
-	return nil
-}
-
 func (sup *srcUserPluginService) storeProperties(repoKey string) error {
 	params := map[string]string{"repoKey": repoKey}
 	requestFullUrl, err := utils.BuildArtifactoryUrl(sup.GetArtifactoryDetails().GetUrl(), "storeProperties", params)
