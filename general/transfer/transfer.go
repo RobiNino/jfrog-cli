@@ -7,10 +7,8 @@ import (
 	"github.com/jfrog/jfrog-cli/utils/cliutils"
 	"github.com/jfrog/jfrog-client-go/artifactory/services"
 	clientUtils "github.com/jfrog/jfrog-client-go/utils"
-	"github.com/jfrog/jfrog-client-go/utils/errorutils"
 	"github.com/jfrog/jfrog-client-go/utils/log"
 	"github.com/urfave/cli"
-	"time"
 )
 
 const (
@@ -19,7 +17,7 @@ const (
 	defaultThreads   = 16
 )
 
-func RunTransfer(c *cli.Context) (err error) {
+func RunTransfer(c *cli.Context) error {
 	if c.NArg() != 3 {
 		return cliutils.PrintHelpAndReturnError("wrong number of arguments.", c)
 	}
@@ -47,7 +45,7 @@ func RunTransfer(c *cli.Context) (err error) {
 		}
 	}
 
-	// todo create repo list here (include exclude)
+	// TODO replace with include/exclude repos.
 	srcRepos, err := tc.getAllSrcLocalRepositories()
 	if err != nil {
 		return err
@@ -61,43 +59,35 @@ func RunTransfer(c *cli.Context) (err error) {
 	for _, repo := range *srcRepos {
 		exists := verifyRepoExistsInTarget(targetRepos, repo.Key)
 		if !exists {
-			// TODO log error.
+			log.Error("Repo '" + repo.Key + "' does not exist in target. Skipping...")
 			continue
 		}
 		for phaseI := 1; phaseI <= numberOfPhases; phaseI++ {
-			var newPhase transferPhase
-			switch phaseI {
-			case 1:
-				newPhase = migrationPhase{}
-			case 2:
-				newPhase = filesDiffPhase{}
-			case 3:
-				newPhase = propertiesDiffPhase{}
-			}
-			// TODO handle errors
-			skip, err := newPhase.shouldSkipPhase(repo.Key)
+			newPhase := getPhaseByNum(phaseI, repo.Key)
+			skip, err := newPhase.shouldSkipPhase()
 			if err != nil {
-				log.Error(err)
+				return err
 			}
 			if skip {
 				continue
 			}
-			tc.initNewPhase(newPhase, repo.Key, srcUpService)
+			tc.initNewPhase(newPhase, srcUpService)
 			err = newPhase.phaseStarted()
 			if err != nil {
-				log.Error(err)
+				return err
 			}
+			log.Debug("Running '" + newPhase.getPhaseName() + "' for repo '" + repo.Key + "'")
 			err = newPhase.run()
 			if err != nil {
-				log.Error(err)
+				return err
 			}
 			err = newPhase.phaseDone()
 			if err != nil {
-				log.Error(err)
+				return err
 			}
 		}
 	}
-	return
+	return nil
 }
 
 func verifyRepoExistsInTarget(targetRepos *[]services.RepositoryDetails, srcRepoKey string) bool {
@@ -109,8 +99,7 @@ func verifyRepoExistsInTarget(targetRepos *[]services.RepositoryDetails, srcRepo
 	return false
 }
 
-func (tc *transferCommandConfig) initNewPhase(newPhase transferPhase, repoKey string, srcUpService *srcUserPluginService) {
-	newPhase.setRepoKey(repoKey)
+func (tc *transferCommandConfig) initNewPhase(newPhase transferPhase, srcUpService *srcUserPluginService) {
 	newPhase.shouldCheckExistenceInFilestore(tc.checkExistenceInFilestore)
 	newPhase.setSourceDetails(tc.sourceRtDetails)
 	newPhase.setTargetDetails(tc.targetRtDetails)
@@ -122,9 +111,10 @@ type transferCommandConfig struct {
 	targetRtDetails           *coreConfig.ServerDetails
 	checkExistenceInFilestore bool
 	repository                string
-	threads                   int
-	retries                   int
-	retryWaitTimeMilliSecs    int
+	// TODO implement or remove:
+	threads                int
+	retries                int
+	retryWaitTimeMilliSecs int
 }
 
 type producerConsumerDetails struct {
@@ -136,7 +126,7 @@ type producerConsumerDetails struct {
 	uploadTokensChan    chan string
 }
 
-// todo remove:
+// TODO use or remove:
 /*
 	summaryErr := tc.printSummary(tc.repository, time.Since(startTime))
 	if summaryErr != nil {
@@ -145,7 +135,7 @@ type producerConsumerDetails struct {
 		}
 		log.Error(summaryErr)
 	}
-*/
+
 func (tc *transferCommandConfig) printSummary(sourceRepo string, timeElapsed time.Duration) error {
 	log.Output("Done. Time elapsed:", timeElapsed)
 	log.Output("")
@@ -173,6 +163,7 @@ func (tc *transferCommandConfig) printSummary(sourceRepo string, timeElapsed tim
 	}
 	return errorutils.CheckErrorf("could not find repo '%s' at storage info", sourceRepo)
 }
+*/
 
 func getCommandConfig(c *cli.Context) (tc transferCommandConfig, err error) {
 	tc.sourceRtDetails, err = coreCommonCommands.GetConfig(c.Args().Get(0), true)
@@ -187,7 +178,7 @@ func getCommandConfig(c *cli.Context) (tc transferCommandConfig, err error) {
 
 	tc.checkExistenceInFilestore = c.Bool(cliutils.Filestore)
 
-	// todo is needed:
+	// TODO implement or remove:
 	tc.repository = c.Args().Get(2)
 
 	tc.threads, err = cliutils.GetThreadsCount(c, 16)

@@ -24,10 +24,6 @@ func (m migrationPhase) getPhaseName() string {
 	return "Migration Phase"
 }
 
-func (m migrationPhase) getPhaseNumber() int {
-	return 1
-}
-
 func (m migrationPhase) phaseStarted() error {
 	m.startTime = time.Now()
 	err := setRepoMigrationStarted(m.repoKey, m.startTime)
@@ -45,16 +41,12 @@ func (m migrationPhase) phaseDone() error {
 	return setRepoMigrationCompleted(m.repoKey)
 }
 
-func (m migrationPhase) setRepoKey(repoKey string) {
-	m.repoKey = repoKey
-}
-
 func (m migrationPhase) shouldCheckExistenceInFilestore(shouldCheck bool) {
 	m.checkExistenceInFilestore = shouldCheck
 }
 
-func (m migrationPhase) shouldSkipPhase(repoKey string) (bool, error) {
-	return isRepoMigrated(repoKey)
+func (m migrationPhase) shouldSkipPhase() (bool, error) {
+	return isRepoMigrated(m.repoKey)
 }
 
 func (m migrationPhase) setSrcUserPluginService(service *srcUserPluginService) {
@@ -88,7 +80,10 @@ func (m migrationPhase) run() error {
 
 	doneChan := make(chan bool, 1)
 
-	go pollUploads(m.srcUpService, uploadTokensChan, doneChan)
+	var pollingError error
+	go func() {
+		pollingError = pollUploads(m.srcUpService, uploadTokensChan, doneChan)
+	}()
 
 	var runnerErr error
 	go func() {
@@ -100,6 +95,9 @@ func (m migrationPhase) run() error {
 
 	if runnerErr != nil {
 		return runnerErr
+	}
+	if pollingError != nil {
+		return pollingError
 	}
 	return errorsQueue.GetError()
 }
@@ -126,8 +124,7 @@ func (m migrationPhase) createFolderMigrationHandlerFunc(pcDetails producerConsu
 }
 
 func (m migrationPhase) migrateFolder(params folderParams, logMsgPrefix string, pcDetails producerConsumerDetails) error {
-	// todo fix log:
-	log.Info(logMsgPrefix+"Visited folder:", path.Join(params.repoKey, params.relativePath))
+	log.Debug(logMsgPrefix+"Visited folder:", path.Join(params.repoKey, params.relativePath))
 
 	result, err := m.getDirectoryContentsAql(params.repoKey, params.relativePath)
 	if err != nil {

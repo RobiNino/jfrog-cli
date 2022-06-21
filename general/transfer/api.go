@@ -14,9 +14,8 @@ const (
 type ChunkFileStatusType string
 
 const (
-	Success ChunkFileStatusType = "SUCCESS"
-	Fail    ChunkFileStatusType = "FAIL"
-	// todo use
+	Success           ChunkFileStatusType = "SUCCESS"
+	Fail              ChunkFileStatusType = "FAIL"
 	SkippedLargeProps ChunkFileStatusType = "SKIPPED_LARGE_PROPS"
 )
 
@@ -36,10 +35,10 @@ type HandlePropertiesDiff struct {
 
 type HandlePropertiesDiffResponse struct {
 	NodeIdResponse
-	PropertiesDelivered json.Number       `json:"properties_delivered,omitempty"`
-	PropertiesTotal     json.Number       `json:"properties_total,omitempty"`
-	Status              ProcessStatusType `json:"status,omitempty"`
-	Errors              string            `json:"errors,omitempty"`
+	PropertiesDelivered json.Number               `json:"properties_delivered,omitempty"`
+	PropertiesTotal     json.Number               `json:"properties_total,omitempty"`
+	Status              ProcessStatusType         `json:"status,omitempty"`
+	Errors              []PropertiesHandlingError `json:"errors,omitempty"`
 }
 
 type PropertiesHandlingError struct {

@@ -25,10 +25,6 @@ func (f filesDiffPhase) getPhaseName() string {
 	return "Files Diff Handling Phase"
 }
 
-func (f filesDiffPhase) getPhaseNumber() int {
-	return 2
-}
-
 func (f filesDiffPhase) phaseStarted() error {
 	// TODO notify progress
 	f.startTime = time.Now()
@@ -44,11 +40,7 @@ func (f filesDiffPhase) phaseDone() error {
 	return setFilesDiffHandlingCompleted(f.repoKey)
 }
 
-func (f filesDiffPhase) setRepoKey(repoKey string) {
-	f.repoKey = repoKey
-}
-
-func (f filesDiffPhase) shouldSkipPhase(repoKey string) (bool, error) {
+func (f filesDiffPhase) shouldSkipPhase() (bool, error) {
 	return false, nil
 }
 
@@ -69,7 +61,7 @@ func (f filesDiffPhase) setTargetDetails(details *coreConfig.ServerDetails) {
 }
 
 func (f filesDiffPhase) run() error {
-	diffStart, diffEnd, err := getDiffHandlingRange(f.repoKey)
+	diffRangeStart, diffRangeEnd, err := getDiffHandlingRange(f.repoKey)
 	if err != nil {
 		return err
 	}
@@ -87,8 +79,9 @@ func (f filesDiffPhase) run() error {
 			uploadTokensChan: uploadTokensChan,
 		}
 
-		curDiffTimeFrame := diffEnd
-		for diffStart.Sub(curDiffTimeFrame) > 0 {
+		// Create tasks to handle files diffs in time frames of searchTimeFramesMinutes.
+		curDiffTimeFrame := diffRangeStart
+		for diffRangeEnd.Sub(curDiffTimeFrame) > 0 {
 			diffTimeFrameHandler := f.createDiffTimeFrameHandlerFunc(pcDetails)
 			_, _ = producerConsumer.AddTaskWithError(diffTimeFrameHandler(timeFrameParams{repoKey: f.repoKey, fromTime: curDiffTimeFrame}), errorsQueue.AddError)
 			curDiffTimeFrame = curDiffTimeFrame.Add(searchTimeFramesMinutes * time.Minute)
@@ -97,7 +90,10 @@ func (f filesDiffPhase) run() error {
 
 	doneChan := make(chan bool, 1)
 
-	go pollUploads(f.srcUpService, uploadTokensChan, doneChan)
+	var pollingError error
+	go func() {
+		pollingError = pollUploads(f.srcUpService, uploadTokensChan, doneChan)
+	}()
 
 	var runnerErr error
 	go func() {
@@ -109,6 +105,9 @@ func (f filesDiffPhase) run() error {
 
 	if runnerErr != nil {
 		return runnerErr
+	}
+	if pollingError != nil {
+		return pollingError
 	}
 
 	return errorsQueue.GetError()
@@ -136,15 +135,17 @@ func (f filesDiffPhase) createDiffTimeFrameHandlerFunc(pcDetails producerConsume
 }
 
 func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgPrefix string, pcDetails producerConsumerDetails) error {
-	log.Info(logMsgPrefix + "Searching time frame: '" + "from" + "' to '" + "to" + "'") // todo
+	fromTimestamp := params.fromTime.Format(time.RFC3339)
+	toTimestamp := params.fromTime.Add(searchTimeFramesMinutes * time.Minute).Format(time.RFC3339)
+	log.Debug(logMsgPrefix + "Searching time frame: '" + fromTimestamp + "' to '" + toTimestamp + "'")
 
-	result, err := f.getTimeFrameFilesDiff(params.repoKey, params.fromTime)
+	result, err := f.getTimeFrameFilesDiff(params.repoKey, fromTimestamp, toTimestamp)
 	if err != nil {
 		return err
 	}
 
 	if len(result.Results) == 0 {
-		// todo probably just log
+		log.Debug("No diffs were found in time frame: '" + fromTimestamp + "' to '" + toTimestamp + "'")
 		return nil
 	}
 
@@ -157,18 +158,14 @@ func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgP
 		if item.Name == "." {
 			continue
 		}
-		if item.Type == "folder" {
-			// todo ?
-		} else {
-			curUploadChunk.appendUploadCandidate(item.Repo, item.Path, item.Name)
-			if len(curUploadChunk.UploadCandidates) == uploadChunkSize {
-				err := uploadChunkWhenPossible(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
-				if err != nil {
-					return err
-				}
-				// Empty the uploaded chunk.
-				curUploadChunk.UploadCandidates = []FileRepresentation{}
+		curUploadChunk.appendUploadCandidate(item.Repo, item.Path, item.Name)
+		if len(curUploadChunk.UploadCandidates) == uploadChunkSize {
+			err := uploadChunkWhenPossible(f.srcUpService, curUploadChunk, pcDetails.uploadTokensChan)
+			if err != nil {
+				return err
 			}
+			// Empty the uploaded chunk.
+			curUploadChunk.UploadCandidates = []FileRepresentation{}
 		}
 	}
 	// Chunk didn't reach full size. Upload the remaining files.
@@ -178,15 +175,13 @@ func (f filesDiffPhase) handleTimeFrameFilesDiff(params timeFrameParams, logMsgP
 	return nil
 }
 
-func (f filesDiffPhase) getTimeFrameFilesDiff(repoKey string, fromTime time.Time) (result *artifactoryUtils.AqlSearchResult, err error) {
-	query := generateDiffAqlQuery(repoKey, fromTime)
+func (f filesDiffPhase) getTimeFrameFilesDiff(repoKey, fromTimestamp, toTimestamp string) (result *artifactoryUtils.AqlSearchResult, err error) {
+	query := generateDiffAqlQuery(repoKey, fromTimestamp, toTimestamp)
 	return runAql(f.srcRtDetails, query)
 }
 
-func generateDiffAqlQuery(repoKey string, fromTime time.Time) string {
-	fromTimestamp := fromTime.Format(time.RFC3339)
-	toTimestamp := fromTime.Add(searchTimeFramesMinutes * time.Minute).Format(time.RFC3339)
-	items := fmt.Sprintf(`items.find({"type":"any","modified":{"$gte":"%s"},"modified":{"$lt":"%s"},"$or":[{"$and":[{"repo":"%s","path":{"$match":"*"},"name":{"$match":"*"}}]}]})`, repoKey, fromTimestamp, toTimestamp)
+func generateDiffAqlQuery(repoKey, fromTimestamp, toTimestamp string) string {
+	items := fmt.Sprintf(`items.find({"type":"file","modified":{"$gte":"%s"},"modified":{"$lt":"%s"},"$or":[{"$and":[{"repo":"%s","path":{"$match":"*"},"name":{"$match":"*"}}]}]})`, repoKey, fromTimestamp, toTimestamp)
 	items += `.include("repo","path","name","type")`
 	return items
 }

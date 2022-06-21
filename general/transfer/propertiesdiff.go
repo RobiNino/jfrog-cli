@@ -2,10 +2,11 @@ package transfer
 
 import (
 	coreConfig "github.com/jfrog/jfrog-cli-core/v2/utils/config"
+	"github.com/jfrog/jfrog-client-go/utils/log"
 	"time"
 )
 
-const waitTimeBetweenPropertiesStatusSeconds = 15
+const waitTimeBetweenPropertiesStatusSeconds = 5
 const propertiesPhaseDisabled = true
 
 type propertiesDiffPhase struct {
@@ -21,10 +22,6 @@ func (p propertiesDiffPhase) getPhaseName() string {
 	return "Properties Diff Handling Phase"
 }
 
-func (p propertiesDiffPhase) getPhaseNumber() int {
-	return 3
-}
-
 func (p propertiesDiffPhase) phaseStarted() error {
 	p.startTime = time.Now()
 	// TODO notify progress
@@ -36,15 +33,11 @@ func (p propertiesDiffPhase) phaseDone() error {
 	return setPropsDiffHandlingCompleted(p.repoKey)
 }
 
-func (p propertiesDiffPhase) setRepoKey(repoKey string) {
-	p.repoKey = repoKey
-}
-
 func (p propertiesDiffPhase) shouldCheckExistenceInFilestore(shouldCheck bool) {
 	p.checkExistenceInFilestore = shouldCheck
 }
 
-func (p propertiesDiffPhase) shouldSkipPhase(string) (bool, error) {
+func (p propertiesDiffPhase) shouldSkipPhase() (bool, error) {
 	return propertiesPhaseDisabled, nil
 }
 
@@ -73,23 +66,18 @@ func (p propertiesDiffPhase) run() error {
 		EndMilliseconds:   convertTimeToEpochMilliseconds(diffEnd),
 	}
 
-	nodes, err := getNodesList()
+	generalStatus, err := makePropsHandlingStatus()
 	if err != nil {
 		return err
 	}
 
-	generalStatus := propsHandlingStatus{
-		nodesStatus: make([]nodeStatus, len(nodes)),
-	}
-
+	// Periodically send handling requests to the user plugin to handle properties diff in a time range.
+	// Update progress with the status return from those requests.
+	// Done handling when all nodes return done status.
 propertiesHandling:
 	for {
-		time.Sleep(waitTimeBetweenPropertiesStatusSeconds * time.Second)
-
-		// Send and handle.
 		remoteNodeStatus, err := p.srcUpService.handlePropertiesDiff(requestBody)
 		if err != nil {
-			// TODO handle error.
 			return err
 		}
 
@@ -97,24 +85,22 @@ propertiesHandling:
 		case InProgress:
 			err = generalStatus.handleInProgressStatus(remoteNodeStatus)
 			if err != nil {
-				// TODO handle error.
 				return err
 			}
 		case Done:
 			err = generalStatus.handleDoneStatus(remoteNodeStatus)
 			if err != nil {
-				// TODO handle error.
 				return err
 			}
-		default:
-			// TODO log error of unknown state.
 		}
 
 		for _, node := range generalStatus.nodesStatus {
 			if !node.isDone {
+				time.Sleep(waitTimeBetweenPropertiesStatusSeconds * time.Second)
 				continue propertiesHandling
 			}
 		}
+
 		notifyPropertiesProgressDone()
 		return nil
 	}
@@ -123,7 +109,6 @@ propertiesHandling:
 type propsHandlingStatus struct {
 	nodesStatus         []nodeStatus
 	totalPropsToDeliver int64
-	// TODO is needed:
 	totalPropsDelivered int64
 }
 type nodeStatus struct {
@@ -133,18 +118,35 @@ type nodeStatus struct {
 	isDone              bool
 }
 
+func makePropsHandlingStatus() (propsHandlingStatus, error) {
+	newStatus := propsHandlingStatus{}
+	nodes, err := getNodesList()
+	if err != nil {
+		return newStatus, err
+	}
+	for i := range nodes {
+		newStatus.nodesStatus = append(newStatus.nodesStatus, nodeStatus{nodeId: nodes[i]})
+	}
+	return newStatus, nil
+}
+
+// Looks for the nodeStatus the belongs to the nodeId. May return nil if an unknown node id is returned.
 func (phs propsHandlingStatus) getNodeStatus(nodeId string) *nodeStatus {
 	for i := range phs.nodesStatus {
 		if nodeId == phs.nodesStatus[i].nodeId {
 			return &phs.nodesStatus[i]
 		}
 	}
-	// TODO handle
+	// Unknown node id was returned.
+	log.Error("Unknown node id '" + nodeId + "' was returned. Skipping...")
 	return nil
 }
 
 func (phs propsHandlingStatus) handleInProgressStatus(remoteNodeStatus *HandlePropertiesDiffResponse) error {
 	localNodeStatus := phs.getNodeStatus(remoteNodeStatus.NodeId)
+	if localNodeStatus == nil {
+		return nil
+	}
 	return phs.updateTotalAndDelivered(localNodeStatus, remoteNodeStatus)
 }
 
@@ -176,6 +178,9 @@ func (phs propsHandlingStatus) updateTotalAndDelivered(localNodeStatus *nodeStat
 
 func (phs propsHandlingStatus) handleDoneStatus(remoteNodeStatus *HandlePropertiesDiffResponse) error {
 	localNodeStatus := phs.getNodeStatus(remoteNodeStatus.NodeId)
+	if localNodeStatus == nil {
+		return nil
+	}
 
 	// Already handled reaching done.
 	if localNodeStatus.isDone {
@@ -183,7 +188,7 @@ func (phs propsHandlingStatus) handleDoneStatus(remoteNodeStatus *HandleProperti
 	}
 
 	localNodeStatus.isDone = true
-	// TODO write errors to file (probably log, not consumable).
+	addErrorsToNonConsumableFile(remoteNodeStatus.Errors)
 	return phs.updateTotalAndDelivered(localNodeStatus, remoteNodeStatus)
 }
 
@@ -196,5 +201,9 @@ func incrementPropertiesProgress(incr int64) {
 }
 
 func notifyPropertiesProgressDone() {
+	// TODO implement
+}
+
+func addErrorsToNonConsumableFile(errors []PropertiesHandlingError) {
 	// TODO implement
 }

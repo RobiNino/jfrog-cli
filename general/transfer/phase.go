@@ -8,18 +8,22 @@ type transferPhase interface {
 	run() error
 	phaseStarted() error
 	phaseDone() error
-	setRepoKey(repoKey string)
 	shouldCheckExistenceInFilestore(bool)
-	shouldSkipPhase(repoKey string) (bool, error)
+	shouldSkipPhase() (bool, error)
 	setSrcUserPluginService(*srcUserPluginService)
 	setSourceDetails(*coreConfig.ServerDetails)
 	setTargetDetails(*coreConfig.ServerDetails)
-
-	// todo not used:
 	getPhaseName() string
-	getPhaseNumber() int
+}
 
-	// todo add when progress
-	//SetProgress(ioUtils.ProgressMgr)
-	//IncrementProgress()
+func getPhaseByNum(i int, repoKey string) transferPhase {
+	switch i {
+	case 1:
+		return migrationPhase{repoKey: repoKey}
+	case 2:
+		return filesDiffPhase{repoKey: repoKey}
+	case 3:
+		return propertiesDiffPhase{repoKey: repoKey}
+	}
+	return nil
 }
