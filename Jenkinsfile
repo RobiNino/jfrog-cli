@@ -38,14 +38,14 @@ node("docker") {
             sh 'git clone https://github.com/jfrog/jfrog-cli.git'
             dir("$repo") {
                 if (BRANCH?.trim()) {
-                    sh "git checkout $BRANCH"
+                    sh "git checkout v2"
                 }
             }
         }
 
-        stage('jf release phase') {
-            runRelease(architectures)
-        }
+        //stage('jf release phase') {
+        //    runRelease(architectures)
+        //}
 
         stage('jfrog release phase') {
             cliExecutableName = 'jfrog'
