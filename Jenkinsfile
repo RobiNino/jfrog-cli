@@ -201,7 +201,7 @@ def buildRpmAndDeb(version, architectures) {
                """
             }
             stage("Distribute deb-rpm to releases") {
-                distributeToReleases("deb-rpm", version, "deb-rpm-rbc-spec.json")
+                distributeToReleasesWithoutCreation("deb-rpm", version, "deb-rpm-rbc-spec.json")
             }
         }
     }
@@ -335,6 +335,10 @@ def buildAndUpload(goos, goarch, pkg, fileExtension) {
     build(goos, goarch, pkg, fileName)
     uploadBinaryToJfrogRepo21(pkg, fileName)
     sh "rm $jfrogCliRepoDir/$fileName"
+}
+
+def distributeToReleasesWithoutCreation(stage, version, rbcSpecName) {
+    sh "$builderPath ds rbd $stage-rb-$identifier $version --site=releases.jfrog.io --sync"
 }
 
 def distributeToReleases(stage, version, rbcSpecName) {
