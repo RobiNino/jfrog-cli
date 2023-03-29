@@ -1,22 +1,44 @@
+.set_jfrog_bin: &set_jfrog_bin
+  - JFROG_BIN="$HOME/.jfrog/bin/"
+  - PATH="$JFROG_BIN:$PATH"
+
+.rm_jf_server: &rm_jf_server
+  - jf c rm setup-jfrog-gitlab-ci-server-${CI_JOB_ID} --quiet
+
 .setup_jfrog:
   script:
-    - PLUGIN_VERSION="1.0.0"
+    - PLUGIN_VERSION="1.1.0"
 
-    # Get custom CLI version, if set
-    - DEFAULT_CLI_VERSION="2.34.4"
-    - JFROG_CLI_VERSION=${JFROG_CLI_VERSION:=$DEFAULT_CLI_VERSION}
+    # Assert JF_URL is provided.
+    - |
+      if [ -z "${JF_URL}" ]; then
+        echo "The 'JF_URL' variable is mandatory."
+        exit 1
+      fi
 
-    # Install JFrog CLI
-    - curl -fL https://install-cli.jfrog.io | sh -s $JFROG_CLI_VERSION
+    # Configure JFrog bin directory to download JFrog CLI to.
+    - *set_jfrog_bin
+    - mkdir -p $JFROG_BIN
+    - chmod +x $JFROG_BIN
 
-    # Verify CLI was downloaded
+    # Install the latest JFrog CLI version, unless JFROG_CLI_VERSION is provided.
+    # Download will be done from a remote repository if JF_RELEASES_REPO was set.
+    - |
+      if [ -n "${JFROG_CLI_VERSION}" ]; then
+        curl -fL https://getcli.jfrog.io/v2-jf | sh -s $JFROG_CLI_VERSION
+      else
+        curl -fL https://getcli.jfrog.io/v2-jf | sh
+      fi
+    - mv ./jf "$JFROG_BIN/"
+
+    # Verify CLI was downloaded.
     - |
       if [ ! -f $(which jf) ]; then
           echo "JFrog CLI Installation failed."
           exit 1
       fi
 
-    # Create server ID
+    # Create server ID.
     - CONFIG_CMD="jf c add setup-jfrog-gitlab-ci-server-${CI_JOB_ID} --overwrite --url ${JF_URL}"
     - |
       if [ -n "${JF_ACCESS_TOKEN}" ]; then
@@ -32,9 +54,9 @@
     - export JFROG_CLI_BUILD_NAME=$CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_NAME
     - export JFROG_CLI_BUILD_NUMBER=$CI_PIPELINE_ID
     - export JFROG_CLI_BUILD_URL=$CI_PIPELINE_URL
-    - export JFROG_CLI_ENV_EXCLUDE=${JFROG_CLI_ENV_EXCLUDE:'*password*;*secret*;*key*;*token*;*auth*;JF_URL;JF_USER;JF_PASSWORD;JF_ACCESS_TOKEN'}
+    - export JFROG_CLI_ENV_EXCLUDE=${JFROG_CLI_ENV_EXCLUDE:='*password*;*secret*;*key*;*token*;*auth*;JF_URL;JF_USER;JF_PASSWORD;JF_ACCESS_TOKEN'}
 
-    # Override registry variables:
+    # Override registry variables if JF_DOCKER_REGISTRY was set:
     - |
       if [ -n "${JF_DOCKER_REGISTRY}" ]; then
         export CI_REGISTRY=$JF_DOCKER_REGISTRY
@@ -43,25 +65,58 @@
         export CI_REGISTRY_PASSWORD=${JF_ACCESS_TOKEN:=$JF_PASSWORD}
       fi
 
+.cleanup_jfrog:
+  script:
+    - *set_jfrog_bin
+    - *rm_jf_server
+
+.set_jfrog_bin_windows: &set_jfrog_bin_windows
+  - $JFROG_BIN="$env:USERPROFILE\.jfrog\bin\"
+  - $env:PATH="$JFROG_BIN;$env:PATH"
+
 .setup_jfrog_windows:
   script:
-    - $PLUGIN_VERSION="1.0.0"
+    - $PLUGIN_VERSION="1.1.0"
 
-    # Get custom CLI version, if set
-    - $DEFAULT_CLI_VERSION="2.34.4"
-    - if (-not $env:JFROG_CLI_VERSION) { $env:JFROG_CLI_VERSION = $DEFAULT_CLI_VERSION }
+    # Install the latest JFrog CLI version, unless JFROG_CLI_VERSION is provided.
+    - |
+      if ($env:JFROG_CLI_VERSION) {
+        Write-Host "Downloading version $env:JFROG_CLI_VERSION of JFrog CLI..."
+      } else {
+        $env:JFROG_CLI_VERSION = "[RELEASE]"
+        Write-Host "Downloading the latest version of JFrog CLI..."
+      }
 
-    # Install JFrog CLI
-    - powershell "Start-Process -Wait -Verb RunAs powershell '-NoProfile iwr https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/[RELEASE]/jfrog-cli-windows-amd64/jf.exe -OutFile $env:SYSTEMROOT\system32\jf.exe'"
+    # Configure JFrog bin directory to download JFrog CLI to.
+    - *set_jfrog_bin_windows
+    - If (!(test-path $JFROG_BIN)) { mkdir $JFROG_BIN }
 
-    # Verify CLI was downloaded
+    # Download will be done from a remote repository if JF_RELEASES_REPO was set.
+    - |
+      if (-not $env:JF_RELEASES_REPO) {
+        Write-Host "Downloading JFrog CLI directly from releases.jfrog.io..."
+        $BASE_URL="https://releases.jfrog.io/artifactory"
+        $AUTH_HEADER=@{}
+      } else {
+        Write-Host "Downloading JFrog CLI from remote repository '$env:JF_RELEASES_REPO'..."
+        $BASE_URL=$env:JF_URL.trim('/') + "/artifactory/" + $env:JF_RELEASES_REPO.trim('/')
+        if ($env:JF_ACCESS_TOKEN) {
+          $AUTH_HEADER = @{Authorization = "Bearer $env:JF_ACCESS_TOKEN"}
+        } else {
+          $ENCODED_CREDS = [System.Convert]::ToBase64String([System.Text.Encoding]::ASCII.GetBytes($env:JF_USER + ":" + $env:JF_PASSWORD))
+          $AUTH_HEADER = @{Authorization = "Basic $ENCODED_CREDS"}
+        }
+      }
+    - iwr $BASE_URL/jfrog-cli/v2-jf/$env:JFROG_CLI_VERSION/jfrog-cli-windows-amd64/jf.exe -OutFile $JFROG_BIN\jf.exe -Headers $AUTH_HEADER
+
+    # Verify CLI was downloaded.
     - |
       if (-not (Get-Command "jf" -ErrorAction SilentlyContinue)) {
         Write-Host "JFrog CLI Installation failed."
       exit 1
       }
 
-    # Create server ID
+    # Create server ID.
     - $CONFIG_CMD="jf c add setup-jfrog-gitlab-ci-server-$env:CI_JOB_ID --overwrite --url $env:JF_URL"
     - |
       if ($env:JF_ACCESS_TOKEN) {
@@ -79,7 +134,7 @@
     - $env:JFROG_CLI_BUILD_URL=$env:CI_PIPELINE_URL
     - if (-not $env:JFROG_CLI_ENV_EXCLUDE) { $env:JFROG_CLI_ENV_EXCLUDE='password;secret;key;token;auth;JF_URL;JF_USER;JF_PASSWORD;JF_ACCESS_TOKEN' }
 
-    # Override registry variables:
+    # Override registry variables if JF_DOCKER_REGISTRY was set:
     - |
       if ($env:JF_DOCKER_REGISTRY) {
         $env:CI_REGISTRY=$env:JF_DOCKER_REGISTRY
@@ -88,6 +143,7 @@
         if ($env:JF_ACCESS_TOKEN) { $env:CI_REGISTRY_PASSWORD=$env:JF_ACCESS_TOKEN } elseif ($env:JF_PASSWORD) { $env:CI_REGISTRY_PASSWORD=$env:JF_PASSWORD }
       }
 
-.cleanup_jfrog:
+.cleanup_jfrog_windows:
   script:
-    - jf c rm setup-jfrog-gitlab-ci-server-${CI_JOB_ID} --quiet
+    - *set_jfrog_bin_windows
+    - *rm_jf_server
