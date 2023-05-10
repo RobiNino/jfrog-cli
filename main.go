@@ -27,6 +27,7 @@ import (
 	"github.com/jfrog/jfrog-cli/pipelines"
 	"github.com/jfrog/jfrog-cli/plugins"
 	"github.com/jfrog/jfrog-cli/plugins/utils"
+	"github.com/jfrog/jfrog-cli/releasebundles"
 	"github.com/jfrog/jfrog-cli/scan"
 	"github.com/jfrog/jfrog-cli/utils/cliutils"
 	"github.com/jfrog/jfrog-cli/xray"
@@ -258,6 +259,7 @@ func getCommands() []cli.Command {
 	allCommands := append(cliNameSpaces, utils.GetPlugins()...)
 	allCommands = append(allCommands, scan.GetCommands()...)
 	allCommands = append(allCommands, buildtools.GetCommands()...)
+	allCommands = append(allCommands, releasebundles.GetCommands()...)
 	return append(allCommands, buildtools.GetBuildToolsHelpCommands()...)
 }
 

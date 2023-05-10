@@ -87,11 +87,11 @@ const (
 	passphrase             = "passphrase"
 
 	// Distribution's Command Keys
-	ReleaseBundleCreate     = "release-bundle-create"
-	ReleaseBundleUpdate     = "release-bundle-update"
-	ReleaseBundleSign       = "release-bundle-sign"
-	ReleaseBundleDistribute = "release-bundle-distribute"
-	ReleaseBundleDelete     = "release-bundle-delete"
+	ReleaseBundleV1Create     = "release-bundle-v1-create"
+	ReleaseBundleV1Update     = "release-bundle-v1-update"
+	ReleaseBundleV1Sign       = "release-bundle-v1-sign"
+	ReleaseBundleV1Distribute = "release-bundle-v1-distribute"
+	ReleaseBundleV1Delete     = "release-bundle-v1-delete"
 
 	// MC's Commands Keys
 	McConfig       = "mc-config"
@@ -127,6 +127,10 @@ const (
 
 	// TransferInstall commands keys
 	TransferInstall = "transfer-plugin-install"
+
+	// Release Bundles commands keys
+	ReleaseBundleCreate  = "release-bundle-create"
+	ReleaseBundlePromote = "release-bundle-promote"
 
 	// *** Artifactory Commands' flags ***
 	// Base flags
@@ -296,11 +300,11 @@ const (
 	copyFlag            = "copy"
 	failFast            = "fail-fast"
 
-	async = "async"
+	Async = "async"
 
 	// Unique build-discard flags
 	buildDiscardPrefix = "bdi-"
-	bdiAsync           = buildDiscardPrefix + async
+	bdiAsync           = buildDiscardPrefix + Async
 	maxDays            = "max-days"
 	maxBuilds          = "max-builds"
 	excludeBuilds      = "exclude-builds"
@@ -402,24 +406,24 @@ const (
 	distUrl = "dist-url"
 
 	// Unique release-bundle-* flags
-	releaseBundlePrefix = "rb-"
-	rbDryRun            = releaseBundlePrefix + dryRun
-	rbRepo              = releaseBundlePrefix + repo
-	rbPassphrase        = releaseBundlePrefix + passphrase
-	distTarget          = releaseBundlePrefix + target
-	rbDetailedSummary   = releaseBundlePrefix + detailedSummary
-	sign                = "sign"
-	desc                = "desc"
-	releaseNotesPath    = "release-notes-path"
-	releaseNotesSyntax  = "release-notes-syntax"
-	distRules           = "dist-rules"
-	site                = "site"
-	city                = "city"
-	countryCodes        = "country-codes"
-	sync                = "sync"
-	maxWaitMinutes      = "max-wait-minutes"
-	deleteFromDist      = "delete-from-dist"
-	createRepo          = "create-repo"
+	releaseBundleV1Prefix = "rbv1-"
+	rbDryRun              = releaseBundleV1Prefix + dryRun
+	rbRepo                = releaseBundleV1Prefix + repo
+	rbPassphrase          = releaseBundleV1Prefix + passphrase
+	distTarget            = releaseBundleV1Prefix + target
+	rbDetailedSummary     = releaseBundleV1Prefix + detailedSummary
+	sign                  = "sign"
+	desc                  = "desc"
+	releaseNotesPath      = "release-notes-path"
+	releaseNotesSyntax    = "release-notes-syntax"
+	distRules             = "dist-rules"
+	site                  = "site"
+	city                  = "city"
+	countryCodes          = "country-codes"
+	sync                  = "sync"
+	maxWaitMinutes        = "max-wait-minutes"
+	deleteFromDist        = "delete-from-dist"
+	createRepo            = "create-repo"
 
 	// *** Xray Commands' flags ***
 	// Base flags
@@ -526,6 +530,20 @@ const (
 	installPluginVersion = installPluginPrefix + Version
 	InstallPluginSrcDir  = "dir"
 	InstallPluginHomeDir = "home-dir"
+
+	// Unique release bundles flags
+	releaseBundlePrefix  = "rb-"
+	rbAsync              = releaseBundlePrefix + Async
+	RbProject            = releaseBundlePrefix + project
+	BuildSource          = "build-source"
+	rbBuild              = releaseBundlePrefix + BuildSource
+	BuildProject         = "build-project"
+	rbBuildProject       = releaseBundlePrefix + BuildProject
+	ReleaseBundlesSource = "rb-source"
+	rbSourceRbs          = releaseBundlePrefix + ReleaseBundlesSource
+	Environment          = "env"
+	rbEnvironment        = releaseBundlePrefix + Environment
+	rbOverwrite          = releaseBundlePrefix + Overwrite
 )
 
 var flagsMap = map[string]cli.Flag{
@@ -977,7 +995,7 @@ var flagsMap = map[string]cli.Flag{
 		Usage: "[Default: false] If set to true, automatically removes build artifacts stored in Artifactory.` `",
 	},
 	bdiAsync: cli.BoolFlag{
-		Name:  async,
+		Name:  Async,
 		Usage: "[Default: false] If set to true, build discard will run asynchronously and will not wait for response.` `",
 	},
 	refs: cli.StringFlag{
@@ -1533,6 +1551,34 @@ var flagsMap = map[string]cli.Flag{
 		Name:  PreChecks,
 		Usage: "[Default: false] Set to true to run pre transfer checks.` `",
 	},
+	rbAsync: cli.BoolTFlag{
+		Name:  Async,
+		Usage: "[Default: true] Set to false to run synchronously and wait for response.` `",
+	},
+	RbProject: cli.StringFlag{
+		Name:  project,
+		Usage: "[Optional] Project key associated with the Release Bundle version.` `",
+	},
+	rbBuild: cli.StringFlag{
+		Name:  BuildSource,
+		Usage: "[Optional] Source build info to create a release bundle from. The option format is build-name/build-number. If you do not specify the build number, the latest build number is used.` `",
+	},
+	rbBuildProject: cli.StringFlag{
+		Name:  BuildProject,
+		Usage: "[Optional] Project key of the source build info. Can only be provided along with the '--build-source' option.` `",
+	},
+	rbSourceRbs: cli.StringFlag{
+		Name:  ReleaseBundlesSource,
+		Usage: "[Optional] Path to a JSON file containing information of the source release bundles from which to create an aggregated release bundle.` `",
+	},
+	rbEnvironment: cli.StringFlag{
+		Name:  Environment,
+		Usage: "[Mandatory] Name of the target environment for the promotion.` `",
+	},
+	rbOverwrite: cli.BoolFlag{
+		Name:  Overwrite,
+		Usage: "[Default: false] Set to true to replace artifacts with the same name but a different checksum if such already exist at the promotion targets. By default, the promotion is stopped in a case of such conflict.` `",
+	},
 }
 
 var commandFlags = map[string][]string{
@@ -1743,23 +1789,23 @@ var commandFlags = map[string][]string{
 	Poetry: {
 		buildName, buildNumber, module, project,
 	},
-	ReleaseBundleCreate: {
+	ReleaseBundleV1Create: {
 		distUrl, user, password, accessToken, serverId, specFlag, specVars, targetProps,
 		rbDryRun, sign, desc, exclusions, releaseNotesPath, releaseNotesSyntax, rbPassphrase, rbRepo, InsecureTls, distTarget, rbDetailedSummary,
 	},
-	ReleaseBundleUpdate: {
+	ReleaseBundleV1Update: {
 		distUrl, user, password, accessToken, serverId, specFlag, specVars, targetProps,
 		rbDryRun, sign, desc, exclusions, releaseNotesPath, releaseNotesSyntax, rbPassphrase, rbRepo, InsecureTls, distTarget, rbDetailedSummary,
 	},
-	ReleaseBundleSign: {
+	ReleaseBundleV1Sign: {
 		distUrl, user, password, accessToken, serverId, rbPassphrase, rbRepo,
 		InsecureTls, rbDetailedSummary,
 	},
-	ReleaseBundleDistribute: {
+	ReleaseBundleV1Distribute: {
 		distUrl, user, password, accessToken, serverId, rbDryRun, distRules,
 		site, city, countryCodes, sync, maxWaitMinutes, InsecureTls, createRepo,
 	},
-	ReleaseBundleDelete: {
+	ReleaseBundleV1Delete: {
 		distUrl, user, password, accessToken, serverId, rbDryRun, distRules,
 		site, city, countryCodes, sync, maxWaitMinutes, InsecureTls, deleteFromDist, deleteQuiet,
 	},
@@ -1810,6 +1856,12 @@ var commandFlags = map[string][]string{
 	},
 	TransferInstall: {
 		installPluginVersion, InstallPluginSrcDir, InstallPluginHomeDir,
+	},
+	ReleaseBundleCreate: {
+		url, user, password, accessToken, serverId, rbAsync, RbProject, rbBuild, rbBuildProject, rbSourceRbs,
+	},
+	ReleaseBundlePromote: {
+		url, user, password, accessToken, serverId, rbAsync, RbProject, rbEnvironment, rbOverwrite,
 	},
 	// Xray's commands
 	OfflineUpdate: {

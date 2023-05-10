@@ -1,0 +1,12 @@
+{
+  "releaseBundles": [
+    {
+      "releaseBundleName": "${RB_NAME1}",
+      "releaseBundleVersion": "111"
+    },
+    {
+      "releaseBundleName": "${RB_NAME2}",
+      "releaseBundleVersion": "222"
+    }
+  ]
+}
