@@ -288,7 +288,7 @@ cd jfrog-cli
 build/build.sh
 ```
 
-On Windows run:
+On Windows runn:
 
 ```
 cd jfrog-cli
