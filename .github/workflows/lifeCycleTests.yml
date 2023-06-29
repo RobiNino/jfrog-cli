@@ -40,4 +40,4 @@ jobs:
           RTLIC: ${{secrets.RTLIC}}
           GOPROXY: direct
       - name: Run Lifecycle tests
-        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.rb
+        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.lc
