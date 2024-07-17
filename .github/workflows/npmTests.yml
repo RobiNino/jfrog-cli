@@ -49,4 +49,6 @@ jobs:
           RTLIC: ${{secrets.RTLIC}}
           GOPROXY: direct
       - name: Run npm tests
-        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm
+        run: |
+          yarn -v
+          go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm
