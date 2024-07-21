@@ -42,10 +42,10 @@ jobs:
           path: ~/go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: ${{ runner.os }}-go-
-      - name: Setup Artifactory
-        run: |
-          go install github.com/jfrog/jfrog-testing-infra/local-rt-setup@latest
-          ~/go/bin/local-rt-setup
+      #- name: Setup Artifactory
+      #  run: |
+      #    go install github.com/jfrog/jfrog-testing-infra/local-rt-setup@latest
+      #    ~/go/bin/local-rt-setup
         env:
           RTLIC: ${{secrets.RTLIC}}
           GOPROXY: direct
@@ -55,3 +55,4 @@ jobs:
           node -v
       - name: Run npm tests
         run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm --jfrog.url=${{ secrets.PLATFORM_URL }} --jfrog.user=${{ secrets.PLATFORM_USER }} --jfrog.password=${{ secrets.PLATFORM_PASSWORD }}
+        #run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm
