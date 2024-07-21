@@ -54,4 +54,4 @@ jobs:
           npm -v
           node -v
       - name: Run npm tests
-        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm
+        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm --jfrog.user=${{ secrets.PLATFORM_USER }} --jfrog.password=${{ secrets.PLATFORM_PASSWORD }}

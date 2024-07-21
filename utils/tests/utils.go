@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	ioutils "github.com/jfrog/gofrog/io"
-	"github.com/jfrog/jfrog-client-go/utils/tests"
 	"io"
 	"math/rand"
 	"os"
@@ -83,7 +82,8 @@ func init() {
 	JfrogPassword = flag.String("jfrog.password", "password", "JFrog platform password")
 	JfrogSshKeyPath = flag.String("jfrog.sshKeyPath", "", "Ssh key file path")
 	JfrogSshPassphrase = flag.String("jfrog.sshPassphrase", "", "Ssh key passphrase")
-	JfrogAccessToken = flag.String("jfrog.adminToken", tests.GetLocalArtifactoryTokenIfNeeded(*JfrogUrl), "JFrog platform admin token")
+	//JfrogAccessToken = flag.String("jfrog.adminToken", tests.GetLocalArtifactoryTokenIfNeeded(*JfrogUrl), "JFrog platform admin token")
+	JfrogAccessToken = flag.String("jfrog.adminToken", "", "JFrog platform admin token")
 	JfrogTargetUrl = flag.String("jfrog.targetUrl", "", "JFrog target platform url for transfer tests")
 	JfrogTargetAccessToken = flag.String("jfrog.targetAdminToken", "", "JFrog target platform admin token for transfer tests")
 	JfrogHome = flag.String("jfrog.home", "", "The JFrog home directory of the local Artifactory installation")
