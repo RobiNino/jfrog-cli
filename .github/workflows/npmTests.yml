@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-13 ]
-        node: [ "12", "13", "14", "15", "16", "17", "18", "19", "20" ]
+        node: [ "12", "13", "14", "15", "16", "17", "18", "19", "20", "21","22","23","24" ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Setup Go
@@ -54,4 +54,4 @@ jobs:
           npm -v
           node -v
       - name: Run npm tests
-        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm --jfrog.user=${{ secrets.PLATFORM_USER }} --jfrog.password=${{ secrets.PLATFORM_PASSWORD }}
+        run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm --jfrog.url=${{ secrets.PLATFORM_URL }} --jfrog.user=${{ secrets.PLATFORM_USER }} --jfrog.password=${{ secrets.PLATFORM_PASSWORD }}
