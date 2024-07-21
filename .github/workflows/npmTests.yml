@@ -15,13 +15,13 @@ concurrency:
 jobs:
   npm-Tests:
     if: contains(github.event.pull_request.labels.*.name, 'safe to test') || github.event_name == 'push'
-    name: npm tests (${{ matrix.os }}) ${{ matrix.node }}
+    name: npm tests (${{ matrix.os }}) (${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu, windows, macos ]
+        os: [ ubuntu-latest, windows-latest, macos-13 ]
         node: [ "12", "13", "14", "15", "16", "17", "18", "19", "20" ]
-    runs-on: ${{ matrix.os }}-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Setup Go
         uses: actions/setup-go@v5
