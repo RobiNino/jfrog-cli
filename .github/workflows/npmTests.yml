@@ -15,7 +15,7 @@ concurrency:
 jobs:
   npm-Tests:
     if: contains(github.event.pull_request.labels.*.name, 'safe to test') || github.event_name == 'push'
-    name: npm tests (${{ matrix.os }})
+    name: npm tests (${{ matrix.os }}) ${{ matrix.node }}
     strategy:
       fail-fast: false
       matrix:
@@ -49,5 +49,9 @@ jobs:
         env:
           RTLIC: ${{secrets.RTLIC}}
           GOPROXY: direct
+      - name: Npm version
+        run: |
+          npm -v
+          node -v
       - name: Run npm tests
         run: go test -v github.com/jfrog/jfrog-cli --timeout 0 --test.npm
