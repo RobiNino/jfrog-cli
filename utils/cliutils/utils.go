@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jfrog/jfrog-cli-core/v2/artifactory/utils/commandsummary"
+	"github.com/jfrog/jfrog-client-go/http/httpclient"
 	"io"
 	"net/http"
 	"os"
@@ -394,6 +395,20 @@ func CreateServerDetailsFromFlags(c *cli.Context) (details *coreConfig.ServerDet
 		details.ServerId = os.Getenv(coreutils.ServerID)
 	}
 	details.InsecureTls = c.Bool(InsecureTls)
+	details.KerberosDetails = httpclient.KerberosDetails{
+		Krb5ConfigPath: c.String(KerberosConfigPath),
+		Username:       c.String(KerberosUsername),
+		Realm:          c.String(KerberosRealm),
+		Password:       c.String(KerberosPassword),
+		KeytabPath:     c.String(KerberosKeytabPath),
+	}
+	if details.KerberosDetails.Krb5ConfigPath == "" || details.KerberosDetails.Username == "" || details.KerberosDetails.Realm == "" {
+		log.Debug(">>KERBEROS>> Krb5 config path, username and realm are mandatory for using kerberos authentication.")
+	}
+	if details.KerberosDetails.Password == "" || details.KerberosDetails.KeytabPath == "" {
+		log.Debug(">>KERBEROS>> Either Password or KeytabPath are mandatory for using kerberos authentication.")
+	}
+
 	return
 }
 

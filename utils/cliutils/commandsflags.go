@@ -202,10 +202,15 @@ const (
 	ChunkSize               = "chunk-size"
 
 	// Config flags
-	interactive   = "interactive"
-	EncPassword   = "enc-password"
-	BasicAuthOnly = "basic-auth-only"
-	Overwrite     = "overwrite"
+	interactive        = "interactive"
+	EncPassword        = "enc-password"
+	BasicAuthOnly      = "basic-auth-only"
+	Overwrite          = "overwrite"
+	KerberosConfigPath = "kerberos-config-path"
+	KerberosUsername   = "kerberos-username"
+	KerberosRealm      = "kerberos-realm"
+	KerberosPassword   = "kerberos-password"
+	KerberosKeytabPath = "kerberos-keytab-path"
 
 	// Unique upload flags
 	uploadPrefix      = "upload-"
@@ -751,6 +756,26 @@ var flagsMap = map[string]cli.Flag{
 		Usage: "[Default: false] Set to true to disable replacing username and password/API key with an automatically created access token that's refreshed hourly. " +
 			"Username and password/API key will still be used with commands which use external tools or the JFrog Distribution service. " +
 			"Can only be passed along with username and password/API key options.` `",
+	},
+	KerberosConfigPath: cli.StringFlag{
+		Name:  KerberosConfigPath,
+		Usage: "[Optional] Path to Krb5 config file for Kerberos client. Mandatory if using Kerberos client` `",
+	},
+	KerberosUsername: cli.StringFlag{
+		Name:  KerberosUsername,
+		Usage: "[Optional] Username for Kerberos client.` `",
+	},
+	KerberosRealm: cli.StringFlag{
+		Name:  KerberosRealm,
+		Usage: "[Optional] Realm for Kerberos client.` `",
+	},
+	KerberosPassword: cli.StringFlag{
+		Name:  KerberosPassword,
+		Usage: "[Optional] Password for Kerberos client. If krb5 config was provided, either password or keytab path are mandatory.` `",
+	},
+	KerberosKeytabPath: cli.StringFlag{
+		Name:  KerberosKeytabPath,
+		Usage: "[Optional] Keytab path for Kerberos client. If krb5 config was provided, either password or keytab path are mandatory.` `",
 	},
 	deb: cli.StringFlag{
 		Name:  deb,
@@ -1722,10 +1747,12 @@ var commandFlags = map[string][]string{
 	AddConfig: {
 		interactive, EncPassword, configPlatformUrl, configRtUrl, configDistUrl, configXrUrl, configMcUrl, configPlUrl, configUser, configPassword, configAccessToken, sshKeyPath, sshPassphrase, ClientCertPath,
 		ClientCertKeyPath, BasicAuthOnly, configInsecureTls, Overwrite, passwordStdin, accessTokenStdin,
+		KerberosConfigPath, KerberosUsername, KerberosRealm, KerberosPassword, KerberosKeytabPath,
 	},
 	EditConfig: {
 		interactive, EncPassword, configPlatformUrl, configRtUrl, configDistUrl, configXrUrl, configMcUrl, configPlUrl, configUser, configPassword, configAccessToken, sshKeyPath, sshPassphrase, ClientCertPath,
 		ClientCertKeyPath, BasicAuthOnly, configInsecureTls, passwordStdin, accessTokenStdin,
+		KerberosConfigPath, KerberosUsername, KerberosRealm, KerberosPassword, KerberosKeytabPath,
 	},
 	DeleteConfig: {
 		deleteQuiet,

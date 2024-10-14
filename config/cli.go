@@ -229,6 +229,7 @@ func validateServerExistence(serverId string, operation configOperation) error {
 	return nil
 }
 
+// TODO add validation for kerberos config and password/keytab
 func validateConfigFlags(configCommandConfiguration *commands.ConfigCommandConfiguration) error {
 	// Validate the option is not used along with access token
 	if configCommandConfiguration.BasicAuthOnly && configCommandConfiguration.ServerDetails.AccessToken != "" {
