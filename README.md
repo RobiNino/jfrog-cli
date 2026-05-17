@@ -264,3 +264,4 @@ docker run docker.bintray.io/jfrog/jfrog-cli-go:latest jfrog <COMMAND>
 
 # Release Notes
 The release are available on [Bintray](https://bintray.com/jfrog/jfrog-cli-go/jfrog-cli-linux-amd64#release).
+
